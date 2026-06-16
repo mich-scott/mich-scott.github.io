@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Portfolio — Spatial Navigation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0c11;
+    --bg-deep:#06070a;
+    --ink:#eceef3;
+    --muted:#838b9c;
+    --faint:#525a6b;
+    --hair:rgba(255,255,255,.10);
+    --hair-soft:rgba(255,255,255,.055);
+
+    /* room accents */
+    --a-door:#cbb892;
+    --a-resume:#6f93c4;
+    --a-projects:#46b39d;
+    --a-art:#d2719f;
+    --a-music:#e2a04e;
+    --a-games:#9a86e0;
+
+    --display:"Syne","Syne Fallback",system-ui,sans-serif;
+    --body:"Inter",system-ui,-apple-system,sans-serif;
+    --mono:"Space Mono","SFMono-Regular",ui-monospace,monospace;
+
+    /* room geometry (kept in sync with JS) */
+    --rw:580px;
+    --rh:380px;
+    --ease:cubic-bezier(.66,0,.18,1);
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:var(--body);
+    background:var(--bg-deep);
+    color:var(--ink);
+    overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+  }
+
+  /* ---------- 3D SCENE ---------- */
+  .scene{
+    position:fixed;
+    inset:0;
+    perspective:1000px;
+    perspective-origin:50% 46%;
+    overflow:hidden;
+    background:
+      radial-gradient(120% 90% at 50% 30%, #11151d 0%, var(--bg) 45%, var(--bg-deep) 100%);
+  }
+  .world{
+    position:absolute;
+    inset:0;
+    transform-style:preserve-3d;
+    transform:translateZ(0);
+    transition:transform 1.15s var(--ease);
+    will-change:transform;
+  }
+
+  /* perspective floor — abstract depth cue, no house imagery */
+  .floor{
+    position:absolute;
+    left:50%; top:50%;
+    width:3200px; height:9200px;
+    margin:-4600px 0 0 -1600px;
+    transform:translate3d(0,230px,-1950px) rotateX(90deg);
+    background-image:
+      linear-gradient(var(--hair-soft) 1px, transparent 1px),
+      linear-gradient(90deg, var(--hair-soft) 1px, transparent 1px);
+    background-size:130px 130px;
+    -webkit-mask-image:radial-gradient(60% 55% at 50% 62%, #000 0%, rgba(0,0,0,.55) 55%, transparent 85%);
+            mask-image:radial-gradient(60% 55% at 50% 62%, #000 0%, rgba(0,0,0,.55) 55%, transparent 85%);
+    pointer-events:none;
+  }
+
+  /* ---------- ROOMS ---------- */
+  .room{
+    position:absolute;
+    left:50%; top:50%;
+    width:var(--rw); height:var(--rh);
+    margin:calc(var(--rh)/-2) 0 0 calc(var(--rw)/-2);
+    border:1px solid var(--hair);
+    border-radius:18px;
+    background:linear-gradient(160deg, rgba(22,26,34,.78), rgba(12,15,20,.86));
+    backdrop-filter:blur(2px);
+    padding:38px 40px;
+    display:flex; flex-direction:column;
+    opacity:.62;
+    cursor:pointer;
+    transition:opacity .6s var(--ease), border-color .6s var(--ease), box-shadow .6s var(--ease);
+  }
+  .room::before{ /* accent glow */
+    content:"";
+    position:absolute; inset:-40% -30%;
+    background:radial-gradient(closest-side, var(--rc, var(--a-door)), transparent 72%);
+    opacity:.10;
+    z-index:-1;
+    transition:opacity .6s var(--ease);
+    filter:blur(4px);
+    pointer-events:none;
+  }
+  .room.is-active{
+    opacity:1;
+    cursor:default;
+    border-color:color-mix(in srgb, var(--rc) 55%, var(--hair));
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--rc) 22%, transparent),
+      0 40px 120px -30px color-mix(in srgb, var(--rc) 45%, transparent);
+  }
+  .room.is-active::before{opacity:.22}
+
+  .room-eyebrow{
+    font-family:var(--mono);
+    font-size:11px; letter-spacing:.22em; text-transform:uppercase;
+    color:var(--rc, var(--muted));
+    display:flex; align-items:center; gap:10px;
+  }
+  .room-eyebrow::after{content:"";flex:1;height:1px;background:var(--hair)}
+  .room-title{
+    font-family:var(--display);
+    font-weight:800;
+    font-size:clamp(34px,4.6vw,52px);
+    line-height:.98;
+    letter-spacing:-.02em;
+    margin-top:auto;
+  }
+  .room-blurb{
+    color:var(--muted);
+    font-size:15px; line-height:1.55;
+    max-width:40ch;
+    margin-top:14px;
+  }
+  .room-foot{
+    margin-top:22px;
+    display:flex; align-items:center; gap:14px;
+  }
+  .chip{
+    font-family:var(--mono);
+    font-size:10px; letter-spacing:.18em; text-transform:uppercase;
+    color:var(--faint);
+    border:1px solid var(--hair);
+    border-radius:100px;
+    padding:5px 11px;
+  }
+  /* skeleton placeholder lines for empty rooms */
+  .skeleton{display:flex;flex-direction:column;gap:9px;margin-top:6px}
+  .skeleton i{display:block;height:8px;border-radius:4px;background:var(--hair-soft)}
+  .skeleton i:nth-child(1){width:78%}
+  .skeleton i:nth-child(2){width:64%}
+  .skeleton i:nth-child(3){width:40%}
+
+  /* DOOR / hero room */
+  .room.is-door{
+    justify-content:center;
+    text-align:left;
+    background:linear-gradient(160deg, rgba(26,24,20,.8), rgba(12,11,9,.9));
+  }
+  .door-name{
+    font-family:var(--display);
+    font-weight:800;
+    font-size:clamp(40px,6vw,68px);
+    line-height:.94; letter-spacing:-.03em;
+  }
+  .door-role{
+    font-family:var(--mono);
+    font-size:12px; letter-spacing:.28em; text-transform:uppercase;
+    color:var(--a-door);
+    margin-bottom:20px;
+  }
+  .door-stmt{color:var(--muted);font-size:16px;line-height:1.6;max-width:42ch;margin-top:18px}
+
+  /* ---------- HUD (fixed, screen-space) ---------- */
+  .vignette{position:fixed;inset:0;pointer-events:none;z-index:5;
+    background:
+      linear-gradient(to bottom, var(--bg-deep) 0%, transparent 16%, transparent 78%, rgba(6,7,10,.92) 100%);}
+
+  .hud{position:fixed;inset:0;z-index:10;pointer-events:none}
+  .hud > *{pointer-events:auto}
+
+  /* top-left brand */
+  .brand{
+    position:fixed; left:30px; top:26px;
+    font-family:var(--mono); font-size:11px; letter-spacing:.24em; text-transform:uppercase;
+    color:var(--muted); line-height:1.8;
+  }
+  .brand b{color:var(--ink);font-weight:700}
+  .brand span{display:block;color:var(--faint);font-size:10px;letter-spacing:.2em}
+
+  /* top-right quick jump */
+  .jump{position:fixed; right:26px; top:24px; display:flex; flex-direction:column; align-items:flex-end; gap:7px}
+  .jump button{
+    font-family:var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+    background:none; border:none; color:var(--faint); cursor:pointer;
+    padding:3px 0; transition:color .2s; display:flex;align-items:center;gap:9px;
+  }
+  .jump button:hover,.jump button:focus-visible{color:var(--ink);outline:none}
+  .jump button .dot{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.5}
+  .jump button.active{color:var(--cur,var(--ink))}
+  .jump button.active .dot{opacity:1;background:var(--cur)}
+
+  /* bottom-center direction pad */
+  .pad{
+    position:fixed; left:50%; bottom:30px; transform:translateX(-50%);
+    display:grid;
+    grid-template-columns:repeat(3,46px);
+    grid-template-rows:repeat(2,46px);
+    gap:7px;
+    align-items:center; justify-items:center;
+  }
+  .pad .d{
+    width:46px;height:46px;border-radius:12px;
+    border:1px solid var(--hair);
+    background:rgba(16,19,25,.6);
+    color:var(--ink);
+    font-size:17px; cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    transition:.18s var(--ease);
+    backdrop-filter:blur(6px);
+    position:relative;
+  }
+  .pad .d:disabled{opacity:.22;cursor:default}
+  .pad .d:not(:disabled):hover{border-color:var(--cur);color:var(--cur);transform:translateY(-2px)}
+  .pad .d:focus-visible{outline:2px solid var(--cur);outline-offset:2px}
+  .pad .up{grid-column:2;grid-row:1}
+  .pad .left{grid-column:1;grid-row:2}
+  .pad .down{grid-column:2;grid-row:2}
+  .pad .right{grid-column:3;grid-row:2}
+  /* tooltip label on hover */
+  .pad .d[data-label]:not(:disabled):hover::after{
+    content:attr(data-label);
+    position:absolute; bottom:calc(100% + 8px); left:50%; transform:translateX(-50%);
+    font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--ink);background:rgba(10,12,17,.95);border:1px solid var(--hair);
+    padding:4px 8px;border-radius:6px;white-space:nowrap;
+  }
+
+  /* bottom-left floor plan (signature) */
+  .plan{
+    position:fixed; left:28px; bottom:26px;
+    width:138px;
+    background:rgba(9,11,16,.62);
+    border:1px solid var(--hair);
+    border-radius:12px;
+    padding:12px 12px 9px;
+    backdrop-filter:blur(8px);
+  }
+  .plan-head{
+    font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--faint);margin-bottom:8px;display:flex;justify-content:space-between;
+  }
+  .plan svg{width:100%;display:block;overflow:visible}
+  .plan .edge{stroke:var(--hair);stroke-width:1.2}
+  .plan .node{fill:var(--bg-deep);stroke:var(--faint);stroke-width:1.4;cursor:pointer;transition:.25s}
+  .plan .node:hover{stroke:var(--ink)}
+  .plan .node.cur{fill:var(--cur);stroke:var(--cur)}
+  .plan .ring{fill:none;stroke:var(--cur);opacity:0;transition:.3s}
+  .plan .ring.cur{opacity:.5}
+  .plan .nlabel{font-family:var(--mono);font-size:5.2px;letter-spacing:.04em;fill:var(--faint);text-transform:uppercase;pointer-events:none;transition:.25s}
+  .plan .nlabel.cur{fill:var(--cur)}
+
+  /* bottom-right coordinate readout */
+  .coord{
+    position:fixed; right:28px; bottom:30px;
+    text-align:right;
+    font-family:var(--mono);
+  }
+  .coord .now{font-size:13px;letter-spacing:.06em;color:var(--cur,var(--ink))}
+  .coord .tag{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--faint);margin-top:4px}
+
+  /* onboarding hint near door */
+  .hint{
+    position:fixed; left:50%; bottom:104px; transform:translateX(-50%);
+    font-family:var(--mono); font-size:10.5px; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--faint); text-align:center; line-height:1.9;
+    transition:opacity .6s; pointer-events:none;
+  }
+  .hint b{color:var(--muted);font-weight:400}
+  .hint.hide{opacity:0}
+
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+  /* ---------- responsive ---------- */
+  @media (max-width:760px){
+    :root{--rw:300px;--rh:430px}
+    .room{padding:28px 26px;border-radius:16px}
+    .brand{left:18px;top:16px}
+    .jump{display:none}
+    .plan{left:14px;bottom:104px;width:104px}
+    .coord{right:16px;bottom:96px}
+    .pad{bottom:20px}
+    .hint{bottom:166px}
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    .world{transition:transform .3s ease}
+    .room,.room::before{transition:none}
+  }
+</style>
+</head>
+<body>
+
+<div class="scene" id="scene">
+  <div class="world" id="world">
+    <div class="floor"></div>
+    <!-- rooms injected by JS -->
+  </div>
+</div>
+
+<div class="vignette"></div>
+
+<div class="hud">
+  <div class="brand">
+    <b>Your Name</b>
+    <span>spatial portfolio · v0</span>
+  </div>
+
+  <nav class="jump" id="jump" aria-label="Jump to room"></nav>
+
+  <div class="hint" id="hint">
+    <span><b>↑ scroll</b> or <b>arrow keys</b> to move · <b>plan</b> to jump</span>
+  </div>
+
+  <div class="plan" aria-label="Floor plan">
+    <div class="plan-head"><span>Floor plan</span><span id="planDepth">00</span></div>
+    <svg id="planSvg" viewBox="0 0 100 126" role="group"></svg>
+  </div>
+
+  <div class="pad" role="group" aria-label="Move through the space">
+    <button class="d up"    id="dUp"    aria-label="Move forward">↑</button>
+    <button class="d left"  id="dLeft"  aria-label="Look left">←</button>
+    <button class="d down"  id="dDown"  aria-label="Move back">↓</button>
+    <button class="d right" id="dRight" aria-label="Look right">→</button>
+  </div>
+
+  <div class="coord">
+    <div class="now" id="coordNow">Entrance</div>
+    <div class="tag" id="coordTag">Entrance · 00</div>
+  </div>
+
+  <div class="sr" id="live" aria-live="polite"></div>
+</div>
+
+<script>
+/* ============================================================
+   ROOM MAP — this is the whole structure of the house.
+   Add a room by adding an object here + wiring its links.
+   x/y/z = position in 3D space.  ry = yaw (side rooms angle in).
+   plan  = position on the 2D floor-plan minimap (viewBox 100x126).
+   links = where ↑forward ↓back ←left →right take you.
+   ============================================================ */
+const SPACING = 1300;      // depth between rooms on the main spine
+const SIDE    = 1300;      // lateral offset for side rooms
+
+const ROOMS = [
+  { id:"door", title:"Your Name", accent:"--a-door", door:true,
+    role:"Designer · Developer · Maker",
+    stmt:"A space to walk through, not scroll. Move straight ahead to go deeper; step left or right to look into a room.",
+    x:0, y:0, z:0, ry:0,
+    plan:{x:50,y:114}, label:"Front door",
+    tag:"Entrance · 00", now:"Entrance",
+    links:{ forward:"resume" } },
+
+  { id:"resume", title:"Résumé", accent:"--a-resume",
+    blurb:"Roles, tools, and the through-line of the work so far.",
+    x:0, y:0, z:-SPACING, ry:0,
+    plan:{x:50,y:88}, label:"Résumé",
+    tag:"Main hall · 01", now:"Résumé",
+    links:{ back:"door", forward:"projects" } },
+
+  { id:"projects", title:"Projects", accent:"--a-projects",
+    blurb:"Things built, shipped, and taken apart to see how they work.",
+    x:0, y:0, z:-SPACING*2, ry:0,
+    plan:{x:50,y:62}, label:"Projects",
+    tag:"Main hall · 02", now:"Projects",
+    links:{ back:"resume", left:"art", right:"music", forward:"games" } },
+
+  { id:"art", title:"Art & Design", accent:"--a-art",
+    blurb:"Visual work — type, image, color, and composition.",
+    x:-SIDE, y:0, z:-SPACING*2, ry:40,
+    plan:{x:20,y:62}, label:"Art",
+    tag:"West wing · 02", now:"Art & Design",
+    links:{ right:"projects" } },
+
+  { id:"music", title:"Music", accent:"--a-music",
+    blurb:"Tracks, mixes, and experiments in sound.",
+    x:SIDE, y:0, z:-SPACING*2, ry:-40,
+    plan:{x:80,y:62}, label:"Music",
+    tag:"East wing · 02", now:"Music",
+    links:{ left:"projects" } },
+
+  { id:"games", title:"Games", accent:"--a-games",
+    blurb:"Playable prototypes and small interactive worlds. Arriving later.",
+    x:0, y:0, z:-SPACING*3, ry:0,
+    plan:{x:50,y:30}, label:"Games",
+    tag:"Back room · 03", now:"Games",
+    links:{ back:"projects" } },
+];
+
+const byId = Object.fromEntries(ROOMS.map(r => [r.id, r]));
+const PLAN_EDGES = [["door","resume"],["resume","projects"],["projects","games"],["projects","art"],["projects","music"]];
+
+const world  = document.getElementById("world");
+const scene  = document.getElementById("scene");
+const reduce = matchMedia("(prefers-reduced-motion:reduce)").matches;
+
+let current = "door";
+let moving  = false;
+
+/* ---------- build room DOM ---------- */
+ROOMS.forEach(r=>{
+  const el = document.createElement("article");
+  el.className = "room" + (r.door ? " is-door" : "");
+  el.id = "room-" + r.id;
+  el.style.setProperty("--rc", `var(${r.accent})`);
+  el.style.transform = `translate3d(${r.x}px, ${r.y}px, ${r.z}px) rotateY(${r.ry}deg)`;
+
+  if(r.door){
+    el.innerHTML = `
+      <div class="door-role">${r.role}</div>
+      <h1 class="door-name">${r.title}</h1>
+      <p class="door-stmt">${r.stmt}</p>`;
+  }else{
+    el.innerHTML = `
+      <div class="room-eyebrow">${r.label}</div>
+      <div class="skeleton" aria-hidden="true"><i></i><i></i><i></i></div>
+      <h2 class="room-title">${r.title}</h2>
+      <p class="room-blurb">${r.blurb}</p>
+      <div class="room-foot"><span class="chip">In progress</span></div>`;
+  }
+  el.addEventListener("click", ()=>{ if(r.id !== current) focus(r.id); });
+  world.appendChild(el);
+});
+
+/* ---------- build floor-plan minimap ---------- */
+const svg = document.getElementById("planSvg");
+let svgHTML = "";
+PLAN_EDGES.forEach(([a,b])=>{
+  const p=byId[a].plan, q=byId[b].plan;
+  svgHTML += `<line class="edge" x1="${p.x}" y1="${p.y}" x2="${q.x}" y2="${q.y}"/>`;
+});
+ROOMS.forEach(r=>{
+  const labelDx = r.plan.x < 30 ? -3 : r.plan.x > 70 ? 3 : 0;
+  const anchor  = r.plan.x < 30 ? "end" : r.plan.x > 70 ? "start" : "middle";
+  const ly = r.plan.y < 35 ? r.plan.y-7 : r.plan.y+9;
+  svgHTML += `
+    <circle class="ring" id="ring-${r.id}" cx="${r.plan.x}" cy="${r.plan.y}" r="7"/>
+    <circle class="node" id="node-${r.id}" cx="${r.plan.x}" cy="${r.plan.y}" r="4.2"
+            tabindex="0" role="button" aria-label="Go to ${r.now}"></circle>
+    <text class="nlabel" id="nl-${r.id}" x="${r.plan.x+labelDx}" y="${ly}" text-anchor="${anchor}">${r.label}</text>`;
+});
+svg.innerHTML = svgHTML;
+ROOMS.forEach(r=>{
+  const n = document.getElementById("node-"+r.id);
+  n.addEventListener("click", ()=>focus(r.id));
+  n.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){e.preventDefault();focus(r.id);} });
+});
+
+/* ---------- build quick-jump ---------- */
+const jump = document.getElementById("jump");
+ROOMS.filter(r=>!r.door).forEach(r=>{
+  const b = document.createElement("button");
+  b.id = "jump-"+r.id;
+  b.innerHTML = `${r.now}<span class="dot"></span>`;
+  b.addEventListener("click", ()=>focus(r.id));
+  jump.appendChild(b);
+});
+
+/* ---------- camera ---------- */
+function cameraFor(r){
+  return `rotateY(${-r.ry}deg) translate3d(${-r.x}px, ${-r.y}px, ${-r.z}px)`;
+}
+
+function focus(id, instant){
+  if(!byId[id] || (id===current && !instant) || (moving && !instant)) return;
+  const r = byId[id];
+  if(instant){
+    const t = world.style.transition;
+    world.style.transition = "none";
+    world.style.transform = cameraFor(r);
+    void world.offsetWidth;            // flush
+    world.style.transition = t;
+  }else{
+    moving = true;
+    world.style.transform = cameraFor(r);
+  }
+  current = id;
+  updateHUD();
+  document.getElementById("hint").classList.add("hide");
+}
+
+if(!reduce){
+  world.addEventListener("transitionend", e=>{ if(e.propertyName==="transform") moving=false; });
+}
+
+/* ---------- HUD sync ---------- */
+const pad = { up:document.getElementById("dUp"), down:document.getElementById("dDown"),
+              left:document.getElementById("dLeft"), right:document.getElementById("dRight") };
+
+function updateHUD(){
+  const r = byId[current];
+  const cur = `var(${r.accent})`;
+  document.documentElement.style.setProperty("--cur", cur);
+
+  // direction pad
+  const map = { up:"forward", down:"back", left:"left", right:"right" };
+  for(const k in pad){
+    const dest = r.links[map[k]];
+    pad[k].disabled = !dest;
+    if(dest){
+      const label = byId[dest].now + (k==="up"&&r.door ? "" : "");
+      pad[k].setAttribute("data-label", (k==="up"&&r.door?"Enter · ":"") + label);
+    }else{
+      pad[k].removeAttribute("data-label");
+    }
+  }
+
+  // coordinate readout
+  document.getElementById("coordNow").textContent = r.now;
+  document.getElementById("coordTag").textContent = r.tag;
+  document.getElementById("planDepth").textContent = r.tag.split("· ")[1] || "";
+
+  // minimap state
+  ROOMS.forEach(x=>{
+    document.getElementById("node-"+x.id).classList.toggle("cur", x.id===current);
+    document.getElementById("ring-"+x.id).classList.toggle("cur", x.id===current);
+    document.getElementById("nl-"+x.id).classList.toggle("cur", x.id===current);
+    const jb = document.getElementById("jump-"+x.id);
+    if(jb) jb.classList.toggle("active", x.id===current);
+  });
+
+  // room active state
+  ROOMS.forEach(x=>document.getElementById("room-"+x.id).classList.toggle("is-active", x.id===current));
+
+  document.getElementById("live").textContent = `Now in: ${r.now}. ${r.tag}.`;
+}
+
+/* ---------- navigation triggers ---------- */
+function go(dir){
+  const link = byId[current].links[dir];
+  if(link) focus(link);
+}
+pad.up.addEventListener("click",   ()=>go("forward"));
+pad.down.addEventListener("click", ()=>go("back"));
+pad.left.addEventListener("click", ()=>go("left"));
+pad.right.addEventListener("click",()=>go("right"));
+
+window.addEventListener("keydown", e=>{
+  const k = e.key.toLowerCase();
+  if(["arrowup","w"].includes(k)){ e.preventDefault(); go("forward"); }
+  else if(["arrowdown","s"].includes(k)){ e.preventDefault(); go("back"); }
+  else if(["arrowleft","a"].includes(k)){ e.preventDefault(); go("left"); }
+  else if(["arrowright","d"].includes(k)){ e.preventDefault(); go("right"); }
+  else if(k==="enter" && current==="door"){ go("forward"); }
+});
+
+// wheel = travel along the spine
+let wheelLock = false;
+window.addEventListener("wheel", e=>{
+  if(wheelLock || moving) return;
+  if(Math.abs(e.deltaY) < 12) return;
+  wheelLock = true;
+  go(e.deltaY > 0 ? "forward" : "back");
+  setTimeout(()=>wheelLock=false, 650);
+}, {passive:true});
+
+// touch swipe
+let tx=0, ty=0;
+window.addEventListener("touchstart", e=>{ tx=e.touches[0].clientX; ty=e.touches[0].clientY; }, {passive:true});
+window.addEventListener("touchend", e=>{
+  const dx=e.changedTouches[0].clientX-tx, dy=e.changedTouches[0].clientY-ty;
+  if(Math.max(Math.abs(dx),Math.abs(dy)) < 45) return;
+  if(Math.abs(dy) > Math.abs(dx)) go(dy<0 ? "forward" : "back");
+  else go(dx<0 ? "right" : "left");
+}, {passive:true});
+
+/* ---------- subtle mouse-look parallax ---------- */
+if(!reduce && matchMedia("(pointer:fine)").matches){
+  let px=50, py=46, tpx=50, tpy=46;
+  window.addEventListener("mousemove", e=>{
+    tpx = 50 + (e.clientX/innerWidth  - .5) * 7;
+    tpy = 46 + (e.clientY/innerHeight - .5) * 5;
+  });
+  (function loop(){
+    px += (tpx-px)*.06; py += (tpy-py)*.06;
+    scene.style.perspectiveOrigin = `${px}% ${py}%`;
+    requestAnimationFrame(loop);
+  })();
+}
+
+/* ---------- init ---------- */
+focus("door", true);
+</script>
+</body>
+</html>
