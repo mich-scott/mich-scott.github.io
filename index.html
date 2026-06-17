@@ -297,7 +297,7 @@
 <div class="vignette"></div>
 
 <div class="hud">
-  <div class="brand"><b>Your Name</b><span>spatial portfolio · v0</span></div>
+  <div class="brand"><b id="brandName">Your Name</b><span id="brandTag">spatial portfolio · v0</span></div>
   <nav class="jump" id="jump" aria-label="Jump to room"></nav>
 
   <div class="hint" id="hint">
@@ -334,10 +334,18 @@
    ============================================================ */
 const SPACING = 1300, SIDE = 1300;
 
+/* ---- YOU: edit these in one place; they flow everywhere ---- */
+const SITE = {
+  name:      "Your Name",
+  role:      "Designer · Developer · Maker",
+  statement: "A space to walk through, not scroll. Move straight ahead to go deeper; step left or right to look into a room.",
+  tagline:   "spatial portfolio · v0",   // the small line under your name, top-left
+};
+
 const ROOMS = [
-  { id:"door", title:"Your Name", accent:"--a-door", door:true,
-    role:"Designer · Developer · Maker",
-    stmt:"A space to walk through, not scroll. Move straight ahead to go deeper; step left or right to look into a room.",
+  { id:"door", title:SITE.name, accent:"--a-door", door:true,
+    role:SITE.role,
+    stmt:SITE.statement,
     x:0, y:0, z:0, ry:0, plan:{x:50,y:114}, label:"Front door",
     tag:"Entrance · 00", now:"Entrance", links:{ forward:"resume" } },
 
@@ -534,6 +542,11 @@ if(!reduce && matchMedia("(pointer:fine)").matches){
     requestAnimationFrame(loop);
   })();
 }
+
+/* identity — single source of truth */
+document.getElementById("brandName").textContent = SITE.name;
+document.getElementById("brandTag").textContent  = SITE.tagline;
+document.title = SITE.name + " — portfolio";
 
 focus("door", true);
 </script>
