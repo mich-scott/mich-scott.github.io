@@ -170,6 +170,215 @@
   .title.door-name{ font-size:clamp(46px,6.4vw,76px); letter-spacing:-.03em; }
   .door-stmt{ max-width:44ch; margin-top:24px; }
 
+  /* ---------- PROJECTS HOLOGRAM CAROUSEL ---------- */
+  .carousel{
+    position:relative;
+    width:100%; height:296px;
+    margin-top:18px;
+    perspective:900px;
+    display:none;                   /* revealed by clicking the title */
+    pointer-events:none;            /* enabled only when the room is active */
+  }
+  .room.is-active .carousel{ pointer-events:auto; }
+
+  /* title-gated reveal */
+  .proj-title{ cursor:pointer; transition:font-size .55s var(--ease), margin .4s var(--ease), text-shadow .35s; }
+  .room.is-active .proj-title:hover{
+    text-shadow:0 0 34px color-mix(in srgb, var(--rc) 75%, transparent), 0 0 80px color-mix(in srgb, var(--rc) 40%, transparent);
+  }
+  .proj-hint{
+    font-family:var(--mono); font-size:10px; letter-spacing:.22em; text-transform:uppercase;
+    color:color-mix(in srgb, var(--rc) 70%, var(--faint));
+    margin-top:18px; opacity:.8;
+  }
+  .room.proj-open .eyebrow,
+  .room.proj-open .proj-blurb,
+  .room.proj-open .proj-hint{ display:none; }
+  .room.proj-open .proj-title{ font-size:clamp(18px,2.2vw,24px); margin-bottom:4px; }
+  .room.proj-open .carousel{ display:block; animation:holoboot .75s var(--ease) both; }
+  @keyframes holoboot{
+    0%  { opacity:0; transform:translateY(16px) scale(.92); filter:blur(7px); }
+    55% { opacity:1; }
+    100%{ opacity:1; transform:none; filter:blur(0); }
+  }
+
+  .stage{
+    position:absolute; inset:0;
+    transform-style:preserve-3d;
+    animation:holofloat 6.5s ease-in-out infinite;
+  }
+  @keyframes holofloat{ 0%,100%{transform:translateY(0)} 50%{transform:translateY(-7px)} }
+
+  .pcard{
+    position:absolute; left:50%; top:50%;
+    width:148px; height:196px;
+    margin:-98px 0 0 -74px;
+    border:0; background:none; padding:0; cursor:pointer;
+    display:flex; flex-direction:column; gap:10px;
+    transform-style:preserve-3d;
+    transition:transform .6s var(--ease), opacity .6s var(--ease);
+    will-change:transform,opacity;
+  }
+  .thumb{
+    flex:1; position:relative; display:block; border-radius:10px; overflow:hidden;
+    background:linear-gradient(158deg,
+      color-mix(in srgb, var(--rc) 32%, transparent),
+      color-mix(in srgb, var(--rc) 7%, transparent));
+    border:1px solid color-mix(in srgb, var(--rc) 45%, transparent);
+    box-shadow:
+      0 0 26px -8px color-mix(in srgb, var(--rc) 55%, transparent),
+      inset 0 0 32px -12px color-mix(in srgb, var(--rc) 60%, transparent);
+    transition:box-shadow .6s var(--ease), border-color .6s var(--ease);
+  }
+  .thumb::before{ /* faint wireframe grid */
+    content:""; position:absolute; inset:0;
+    background-image:
+      linear-gradient(color-mix(in srgb, var(--rc) 20%, transparent) 1px, transparent 1px),
+      linear-gradient(90deg, color-mix(in srgb, var(--rc) 20%, transparent) 1px, transparent 1px);
+    background-size:22px 22px; opacity:.5;
+  }
+  .thumb::after{ /* scanlines */
+    content:""; position:absolute; inset:0; pointer-events:none;
+    background:repeating-linear-gradient(to bottom, rgba(255,255,255,.045) 0 1px, transparent 1px 3px);
+    mix-blend-mode:screen; opacity:.7;
+  }
+  .pnum{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font-family:var(--display); font-weight:800; font-size:52px; letter-spacing:-.02em;
+    color:color-mix(in srgb, var(--rc) 65%, #eaf6f2);
+    text-shadow:0 0 22px color-mix(in srgb, var(--rc) 70%, transparent);
+    opacity:.82;
+  }
+  .pname{
+    display:block; font-family:var(--mono);
+    font-size:11px; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--muted); text-align:center;
+    transition:color .6s var(--ease), text-shadow .6s var(--ease);
+  }
+  .pcard.is-front .thumb{
+    border-color:color-mix(in srgb, var(--rc) 80%, transparent);
+    box-shadow:
+      0 0 44px -6px color-mix(in srgb, var(--rc) 70%, transparent),
+      inset 0 0 44px -10px color-mix(in srgb, var(--rc) 70%, transparent);
+  }
+  .pcard.is-front .pname{
+    color:#f4fbf9; text-shadow:0 0 14px color-mix(in srgb, var(--rc) 60%, transparent);
+  }
+
+  .projector{ /* hologram emitter glow at the base */
+    position:absolute; left:50%; bottom:-2px; transform:translateX(-50%);
+    width:210px; height:54px;
+    background:radial-gradient(ellipse at 50% 100%, color-mix(in srgb, var(--rc) 42%, transparent), transparent 70%);
+    filter:blur(8px); opacity:.5; pointer-events:none;
+    animation:holoflicker 5s steps(1,end) infinite;
+  }
+  @keyframes holoflicker{ 0%,96%,100%{opacity:.5} 97%{opacity:.3} 98%{opacity:.6} 99%{opacity:.42} }
+
+  .carnav{
+    position:absolute; left:50%; bottom:-30px; transform:translateX(-50%);
+    display:flex; align-items:center; gap:20px;
+  }
+  .carbtn{
+    width:32px; height:32px; border:0; background:none; cursor:pointer; line-height:1;
+    color:color-mix(in srgb, var(--rc) 65%, var(--muted)); font-size:24px;
+    transition:.2s var(--ease);
+  }
+  .carbtn:not(:disabled):hover{ color:#fff; text-shadow:0 0 12px var(--rc); transform:scale(1.18); }
+  .carbtn:not(:disabled):focus-visible{ outline:none; color:#fff; text-shadow:0 0 12px var(--rc); }
+  .carbtn:disabled{ opacity:.22; cursor:default; }
+  .carcount{
+    font-family:var(--mono); font-size:11px; letter-spacing:.16em;
+    color:var(--muted); min-width:64px; text-align:center;
+  }
+  .pcard:focus-visible{ outline:none; }
+  .pcard:focus-visible .thumb{ border-color:#fff; box-shadow:0 0 30px -6px var(--rc); }
+
+  /* calm the hologram when you're not in the room */
+  .room:not(.is-active) .stage,
+  .room:not(.is-active) .projector{ animation:none; }
+
+  @media (max-width:760px){
+    .carousel{ height:250px; }
+    .pcard{ width:120px; height:160px; margin:-80px 0 0 -60px; }
+    .pnum{ font-size:42px; }
+  }
+  @media (prefers-reduced-motion:reduce){
+    .stage,.projector{ animation:none; }
+  }
+
+  .plaunch{
+    display:none;
+    font-family:var(--mono); font-size:10px; letter-spacing:.18em; text-transform:uppercase;
+    color:color-mix(in srgb, var(--rc) 80%, #eaf6f2);
+    text-shadow:0 0 12px color-mix(in srgb, var(--rc) 60%, transparent);
+    margin-top:2px;
+  }
+  .pcard.is-front .plaunch{ display:block; }
+  .pcard[data-live] .thumb{ border-color:color-mix(in srgb, var(--rc) 60%, transparent); }
+
+  /* ---------- EMBEDDED APP SHELL (live project, AR-style) ---------- */
+  .app-shell{ position:fixed; inset:0; z-index:60; display:none; }
+  .app-shell.is-open{ display:block; }
+  .app-backdrop{
+    position:absolute; inset:0; cursor:pointer;
+    background:rgba(4,6,10,.55);
+    backdrop-filter:blur(10px) saturate(.92);
+    opacity:0; transition:opacity .4s var(--ease);
+  }
+  .app-shell.is-open .app-backdrop{ opacity:1; }
+  .app-screen{
+    position:absolute; left:50%; top:50%;
+    transform:translate(-50%,-50%) scale(.95);
+    width:min(1120px,92vw); height:min(740px,86vh);
+    display:flex; flex-direction:column;
+    border:1px solid color-mix(in srgb, var(--a-projects) 55%, transparent);
+    border-radius:14px; overflow:hidden; background:#06080c;
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--a-projects) 22%, transparent),
+      0 36px 130px -30px color-mix(in srgb, var(--a-projects) 60%, transparent),
+      0 0 90px -20px color-mix(in srgb, var(--a-projects) 40%, transparent);
+    opacity:0; transition:opacity .45s var(--ease), transform .45s var(--ease);
+  }
+  .app-shell.is-open .app-screen{
+    opacity:1; transform:translate(-50%,-50%) scale(1);
+    animation:appboot .6s var(--ease) both;
+  }
+  @keyframes appboot{ 0%{ filter:blur(9px) brightness(1.4); } 100%{ filter:blur(0) brightness(1); } }
+
+  .app-bar{
+    display:flex; align-items:center; gap:12px; padding:11px 15px;
+    background:color-mix(in srgb, var(--a-projects) 9%, #0a0e13);
+    border-bottom:1px solid color-mix(in srgb, var(--a-projects) 28%, transparent);
+  }
+  .app-dot{ width:8px; height:8px; border-radius:50%; background:var(--a-projects); box-shadow:0 0 10px var(--a-projects); }
+  .app-name{ font-family:var(--mono); font-size:12px; letter-spacing:.18em; text-transform:uppercase; color:var(--ink); }
+  .app-live{
+    font-family:var(--mono); font-size:9px; letter-spacing:.2em; text-transform:uppercase;
+    color:color-mix(in srgb, var(--a-projects) 80%, #fff);
+    border:1px solid color-mix(in srgb, var(--a-projects) 40%, transparent);
+    border-radius:100px; padding:2px 8px;
+  }
+  .app-ext{
+    margin-left:auto; font-family:var(--mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--muted); text-decoration:none; padding:6px 4px; transition:.2s var(--ease);
+  }
+  .app-ext:hover,.app-ext:focus-visible{ color:color-mix(in srgb, var(--a-projects) 85%, #fff); outline:none; }
+  .app-off{
+    font-family:var(--mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase;
+    background:none; border:1px solid color-mix(in srgb, var(--a-projects) 35%, transparent);
+    color:var(--muted); border-radius:8px; padding:6px 13px; cursor:pointer; transition:.2s var(--ease);
+  }
+  .app-off:hover,.app-off:focus-visible{ color:#fff; border-color:var(--a-projects); box-shadow:0 0 16px -4px var(--a-projects); outline:none; }
+  .app-frame{ position:relative; flex:1; background:#06080c; }
+  #appFrame{ width:100%; height:100%; border:0; display:block; background:#06080c; }
+  .app-scan{
+    position:absolute; inset:0; pointer-events:none;
+    background:repeating-linear-gradient(to bottom, color-mix(in srgb,var(--a-projects) 8%, transparent) 0 1px, transparent 1px 3px);
+    mix-blend-mode:screen; opacity:.22;
+    box-shadow:inset 0 0 60px -10px color-mix(in srgb,var(--a-projects) 40%, transparent);
+  }
+  @media (prefers-reduced-motion:reduce){ .app-shell.is-open .app-screen{ animation:none; } }
+
   /* ---------- HUD (ghosted) ---------- */
   .vignette{position:fixed;inset:0;pointer-events:none;z-index:5;
     background:linear-gradient(to bottom, var(--bg-deep) 0%, transparent 18%, transparent 80%, rgba(6,7,10,.9) 100%);}
@@ -324,6 +533,23 @@
   <div class="sr" id="live" aria-live="polite"></div>
 </div>
 
+<div class="app-shell" id="appShell" aria-hidden="true">
+  <div class="app-backdrop"></div>
+  <div class="app-screen" role="dialog" aria-modal="true" aria-label="Embedded project">
+    <div class="app-bar">
+      <span class="app-dot"></span>
+      <span class="app-name" id="appName">Project</span>
+      <span class="app-live">live</span>
+      <a class="app-ext" id="appExt" target="_blank" rel="noopener" aria-label="Open in a new tab">open &#8599;</a>
+      <button class="app-off" id="appOff" aria-label="Power off and return to the room">power off</button>
+    </div>
+    <div class="app-frame">
+      <iframe id="appFrame" title="Embedded project" referrerpolicy="no-referrer"></iframe>
+      <div class="app-scan"></div>
+    </div>
+  </div>
+</div>
+
 <script>
 /* ============================================================
    ROOM MAP — the whole structure of the house lives here.
@@ -336,11 +562,21 @@ const SPACING = 1300, SIDE = 1300;
 
 /* ---- YOU: edit these in one place; they flow everywhere ---- */
 const SITE = {
-  name:      "Mich-Scott",
+  name:      "Your Name",
   role:      "Designer · Developer · Maker",
   statement: "A space to walk through, not scroll. Move straight ahead to go deeper; step left or right to look into a room.",
   tagline:   "spatial portfolio · v0",   // the small line under your name, top-left
 };
+
+/* ---- Projects shown in the Projects-room carousel (placeholders for now) ---- */
+const PROJECTS = [
+  { title:"Color Selector", url:"https://mich-scott.github.io/color-selector/" },
+  { title:"Project 2" },
+  { title:"Project 3" },
+  { title:"Project 4" },
+  { title:"Project 5" },
+  { title:"Project 6" },
+];
 
 const ROOMS = [
   { id:"door", title:SITE.name, accent:"--a-door", door:true,
@@ -394,19 +630,131 @@ ROOMS.forEach((r,i)=>{
   el.style.setProperty("--delay", (-(i * 1.7)) + "s");
   el.style.transform = `translate3d(${r.x}px, ${r.y}px, ${r.z}px) rotateY(${r.ry}deg)`;
 
-  const inner = r.door
-    ? `<div class="eyebrow door-role">${r.role}</div>
+  let inner;
+  if(r.door){
+    inner = `<div class="eyebrow door-role">${r.role}</div>
        <h1 class="title door-name">${r.title}</h1>
-       <p class="blurb door-stmt">${r.stmt}</p>`
-    : `<div class="eyebrow">${r.label}</div>
+       <p class="blurb door-stmt">${r.stmt}</p>`;
+  } else if(r.id === "projects"){
+    inner = `<div class="eyebrow">${r.label}</div>
+       <h2 class="title proj-title" id="projTitle" role="button" tabindex="0" aria-expanded="false" aria-controls="projCarousel">${r.title}</h2>
+       <p class="blurb proj-blurb">${r.blurb}</p>
+       <div class="proj-hint">&#9656; click to open</div>
+       <div class="carousel" id="projCarousel">
+         <div class="stage" id="carStage">
+           ${PROJECTS.map((p,i)=>`
+             <button class="pcard" data-i="${i}"${p.url ? ' data-live="1"' : ''} aria-label="${p.title}${p.url ? ' — live app" ' : '" '}>
+               <span class="thumb"><span class="pnum">${String(i+1).padStart(2,"0")}</span></span>
+               <span class="pname">${p.title}</span>
+               ${p.url ? '<span class="plaunch">&#9656; launch</span>' : ''}
+             </button>`).join("")}
+         </div>
+         <div class="projector"></div>
+         <div class="carnav">
+           <button class="carbtn" id="carPrev" aria-label="Previous project">&lsaquo;</button>
+           <span class="carcount" id="carCount">01 / ${PROJECTS.length}</span>
+           <button class="carbtn" id="carNext" aria-label="Next project">&rsaquo;</button>
+         </div>
+       </div>`;
+  } else {
+    inner = `<div class="eyebrow">${r.label}</div>
        <h2 class="title">${r.title}</h2>
        <p class="blurb">${r.blurb}</p>
        <div class="tagline">in progress</div>`;
+  }
 
   el.innerHTML = `<div class="haze"></div><div class="seat"></div><div class="content">${inner}</div>`;
   el.addEventListener("click", ()=>{ if(r.id !== current) focus(r.id); });
   world.appendChild(el);
 });
+
+/* ---------- projects carousel (coverflow) ---------- */
+function initCarousel(){
+  const stage = document.getElementById("carStage");
+  if(!stage) return;
+  const cards = [...stage.querySelectorAll(".pcard")];
+  const prev  = document.getElementById("carPrev");
+  const next  = document.getElementById("carNext");
+  const count = document.getElementById("carCount");
+  const N = cards.length;
+  let active = 0;
+
+  function layout(){
+    cards.forEach((c,i)=>{
+      const d = i - active, ad = Math.abs(d), s = Math.sign(d);
+      const x  = d===0 ? 0 : s * (118 + (ad-1) * 46);
+      const ry = d===0 ? 0 : -s * 48;
+      const z  = -ad * 70;
+      c.style.transform = `translateX(${x}px) translateZ(${z}px) rotateY(${ry}deg)`;
+      c.style.opacity = ad > 3 ? 0 : Math.max(.16, 1 - ad * .3);
+      c.style.zIndex = 100 - ad;
+      c.style.pointerEvents = ad > 3 ? "none" : "auto";
+      c.classList.toggle("is-front", d===0);
+      c.setAttribute("aria-current", d===0 ? "true" : "false");
+    });
+    count.textContent = String(active+1).padStart(2,"0") + " / " + N;
+    prev.disabled = active === 0;
+    next.disabled = active === N-1;
+  }
+  function goTo(i){ active = Math.max(0, Math.min(N-1, i)); layout(); }
+
+  cards.forEach((c,i)=> c.addEventListener("click", e=>{
+    e.stopPropagation();
+    if(i !== active){ goTo(i); return; }
+    const p = PROJECTS[i];
+    if(p && p.url) openApp(p);
+  }));
+  prev.addEventListener("click", e=>{ e.stopPropagation(); goTo(active-1); });
+  next.addEventListener("click", e=>{ e.stopPropagation(); goTo(active+1); });
+
+  layout();
+  window.__carousel = { goTo, get active(){ return active; } };
+
+  // title-gated reveal
+  const room  = document.getElementById("room-projects");
+  const title = document.getElementById("projTitle");
+  function setOpen(open){
+    room.classList.toggle("proj-open", open);
+    title.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+  function toggle(){ setOpen(!room.classList.contains("proj-open")); }
+  title.addEventListener("click", e=>{
+    if(current !== "projects") return;        // not arrived yet → let it bubble and navigate
+    e.stopPropagation(); toggle();
+  });
+  title.addEventListener("keydown", e=>{
+    if((e.key==="Enter" || e.key===" ") && current==="projects"){ e.preventDefault(); e.stopPropagation(); toggle(); }
+  });
+  window.__projects = { close:()=>setOpen(false) };
+}
+initCarousel();
+
+/* ---------- embedded app shell (live project, AR-style) ---------- */
+const appShell = document.getElementById("appShell");
+const appFrame = document.getElementById("appFrame");
+const appName  = document.getElementById("appName");
+const appOff   = document.getElementById("appOff");
+const appExt   = document.getElementById("appExt");
+let appOpen = false;
+
+function openApp(p){
+  appName.textContent = p.title;
+  appExt.href = p.url;
+  appFrame.src = p.url;                     // lazy: only loads now
+  appShell.classList.add("is-open");
+  appShell.setAttribute("aria-hidden","false");
+  appOpen = true;
+  appOff.focus();
+}
+function closeApp(){
+  if(!appOpen) return;
+  appShell.classList.remove("is-open");
+  appShell.setAttribute("aria-hidden","true");
+  appFrame.src = "about:blank";             // unload to free memory
+  appOpen = false;
+}
+appOff.addEventListener("click", closeApp);
+appShell.querySelector(".app-backdrop").addEventListener("click", closeApp);
 
 /* build floor-plan minimap */
 const svg = document.getElementById("planSvg");
@@ -459,6 +807,7 @@ function focus(id, instant){
     world.style.transform = cameraFor(r);
   }
   current = id;
+  if(id !== "projects" && window.__projects) window.__projects.close();
   updateHUD();
   document.getElementById("hint").classList.add("hide");
 }
@@ -505,6 +854,19 @@ pad.right.addEventListener("click",()=>go("right"));
 
 window.addEventListener("keydown", e=>{
   const k = e.key.toLowerCase();
+
+  if(appOpen){ if(k==="escape") closeApp(); return; }
+
+  if(k==="escape" && current==="projects" && window.__projects){ window.__projects.close(); return; }
+
+  // when focus is inside the carousel, left/right flip projects instead of changing rooms
+  const inCar = document.activeElement && document.activeElement.closest
+    ? document.activeElement.closest(".carousel") : null;
+  if(inCar && current==="projects" && window.__carousel){
+    if(k==="arrowleft"||k==="a"){ e.preventDefault(); window.__carousel.goTo(window.__carousel.active-1); return; }
+    if(k==="arrowright"||k==="d"){ e.preventDefault(); window.__carousel.goTo(window.__carousel.active+1); return; }
+  }
+
   if(["arrowup","w"].includes(k)){ e.preventDefault(); go("forward"); }
   else if(["arrowdown","s"].includes(k)){ e.preventDefault(); go("back"); }
   else if(["arrowleft","a"].includes(k)){ e.preventDefault(); go("left"); }
@@ -514,7 +876,7 @@ window.addEventListener("keydown", e=>{
 
 let wheelLock = false;
 window.addEventListener("wheel", e=>{
-  if(wheelLock || moving || Math.abs(e.deltaY) < 12) return;
+  if(appOpen || wheelLock || moving || Math.abs(e.deltaY) < 12) return;
   wheelLock = true;
   go(e.deltaY > 0 ? "forward" : "back");
   setTimeout(()=>wheelLock=false, 650);
@@ -523,6 +885,7 @@ window.addEventListener("wheel", e=>{
 let tx=0, ty=0;
 window.addEventListener("touchstart", e=>{ tx=e.touches[0].clientX; ty=e.touches[0].clientY; }, {passive:true});
 window.addEventListener("touchend", e=>{
+  if(appOpen) return;
   const dx=e.changedTouches[0].clientX-tx, dy=e.changedTouches[0].clientY-ty;
   if(Math.max(Math.abs(dx),Math.abs(dy)) < 45) return;
   if(Math.abs(dy) > Math.abs(dx)) go(dy<0 ? "forward" : "back");
