@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Elev8 || OR</title>
+<style>
+  :root { --ink: #111; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%;
+    background: #ececec;
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    color: #555;
+  }
+  .stage {
+    min-height: 100%;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 12px; padding: 24px;
+  }
+  canvas {
+    width: min(86vw, 86vh, 620px);
+    height: auto; aspect-ratio: 1 / 1;
+    background: #fff;
+    image-rendering: pixelated;
+    box-shadow: 0 18px 40px rgba(0,0,0,0.10);
+  }
+  .caption {
+    font-size: 12px; letter-spacing: 0.35em;
+    text-transform: uppercase; color: #999; user-select: none;
+  }
+  .caption b { color: var(--ink); letter-spacing: 0.2em; }
+  #hint {
+    font-size: 10px; letter-spacing: 0.18em;
+    text-transform: uppercase; color: #b3b3b3;
+    transition: opacity .4s ease; user-select: none;
+  }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <canvas id="game" width="600" height="600" aria-label="Elev8 scene"></canvas>
+    <div class="caption"><b>Elev8</b> &nbsp;||&nbsp; OR</div>
+    <div id="hint">press enter &nbsp;·&nbsp; or click the call button</div>
+  </div>
+
+<script>
+(() => {
+  const cv  = document.getElementById('game');
+  const ctx = cv.getContext('2d');
+  const hint = document.getElementById('hint');
+  const W = 600, H = 600;
+  const R = Math.round;
+
+  // ---- Layout ----------------------------------------------------------
+  const ROOM   = { x: 70, y: 70, w: 460, h: 460 };
+  const GROUND = 500;
+
+  const ELE = { w: 132, h: 200 };
+  ELE.x  = R(ROOM.x + ROOM.w / 2 - ELE.w / 2);
+  ELE.y  = GROUND - ELE.h;
+  ELE.cx = ELE.x + ELE.w / 2;
+
+  const BTN = { x: ELE.x + ELE.w + 14, y: ELE.y + ELE.h - 64, w: 16, h: 30 };
+  BTN.cx = BTN.x + 8; BTN.cy = BTN.y + 15; BTN.hit = 18;
+
+  // ---- State -----------------------------------------------------------
+  const U = 6, SPEED = 78;
+  const char = {
+    x: ROOM.x + ROOM.w + 20, feetY: GROUND, scale: 1, alpha: 1,
+    phase: 0, facing: 'left', state: 'walking',
+    blink: 0, blinkTimer: 1.5 + Math.random() * 2
+  };
+
+  let scene = 1, s1Alpha = 1, s2Alpha = 0;
+  let stateTimer = 0, clock = 0, buttonLit = false;
+
+  let floor = 0, pendingDir = 0;
+  let bubbleText = '', bubbleAlpha = 0, bubblePop = 0;
+  let shakeTime = 0;
+  let dkCurrent = 0;                 // smoothed darkness, 0 = bright, 1 = pitch black
+
+  const ANNOUNCE_DUR = 0.7, SETTLE_DUR = 0.35, SHAKE_DUR = 1.0, SHAKE_AMP = 5;
+
+  // colours recomputed each frame from dkCurrent
+  let BG = '#fff', INK = '#111';
+
+  const floorLabel = f => f > 0 ? String(f) : f < 0 ? 'B' + (-f) : null;
+
+  // descent darkness: eased, complete at B20
+  function darknessTarget() {
+    if (scene !== 2 || floor >= 0) return 0;
+    return Math.pow(Math.min(1, (-floor) / 20), 0.6);
+  }
+
+  // ---- Input -----------------------------------------------------------
+  function callElevator() {
+    if (scene !== 1 || char.state !== 'idle') return;
+    char.state = 'turning'; char.facing = 'away';
+    stateTimer = 0; buttonLit = true; hint.style.opacity = 0;
+  }
+  function travel(dir) {
+    if (scene !== 2 || char.state !== 'asking') return;
+    pendingDir = dir;
+    bubbleText = dir > 0 ? 'Going up.' : 'Going down.';
+    bubblePop = 0.18;
+    char.state = 'announce'; stateTimer = 0;
+  }
+  function canvasPoint(e) {
+    const r = cv.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * (W / r.width),
+             y: (e.clientY - r.top)  * (H / r.height) };
+  }
+  const overButton = p => Math.hypot(p.x - BTN.cx, p.y - BTN.cy) <= BTN.hit;
+
+  cv.addEventListener('click', e => { if (overButton(canvasPoint(e))) callElevator(); });
+  cv.addEventListener('mousemove', e => {
+    const active = scene === 1 && char.state === 'idle' && overButton(canvasPoint(e));
+    cv.style.cursor = active ? 'pointer' : 'default';
+  });
+  window.addEventListener('keydown', e => {
+    if (e.key === 'Enter')          { e.preventDefault(); callElevator(); }
+    else if (e.key === 'ArrowUp')   { e.preventDefault(); travel(1); }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); travel(-1); }
+  });
+
+  // ---- Update ----------------------------------------------------------
+  function update(dt) {
+    clock += dt;
+
+    switch (char.state) {
+      case 'walking':
+        char.facing = 'left'; char.x -= SPEED * dt; char.phase += dt * 9;
+        if (char.x <= ELE.cx) { char.x = ELE.cx; char.facing = 'front'; char.state = 'idle'; char.phase = 0; }
+        break;
+
+      case 'idle': char.facing = 'front'; break;
+
+      case 'turning':
+        char.facing = 'away'; stateTimer += dt;
+        if (stateTimer >= 0.5) { char.state = 'boarding'; char.phase = 0; stateTimer = 0; }
+        break;
+
+      case 'boarding': {
+        char.facing = 'away'; stateTimer += dt; char.phase += dt * 7;
+        const p = Math.min(1, stateTimer / 1.2);
+        char.feetY = GROUND - p * 70;
+        char.scale = 1 - p * 0.42;
+        char.alpha = p < 0.55 ? 1 : Math.max(0, 1 - (p - 0.55) / 0.45);
+        if (p > 0.7) s1Alpha = Math.max(0, 1 - (p - 0.7) / 0.3);
+        if (p >= 1) { char.state = 'clearing'; char.alpha = 0; stateTimer = 0; }
+        break;
+      }
+
+      case 'clearing':
+        s1Alpha = Math.max(0, s1Alpha - dt / 0.4); stateTimer += dt;
+        if (stateTimer >= 0.5) {
+          scene = 2; s2Alpha = 0; floor = 0; dkCurrent = 0;
+          char.feetY = GROUND; char.scale = 1; char.alpha = 1;
+          char.x = ROOM.x - 30; char.facing = 'right';
+          char.phase = 0; char.state = 'walking2'; stateTimer = 0;
+        }
+        break;
+
+      case 'walking2': {
+        s2Alpha = Math.min(1, s2Alpha + dt / 0.4);
+        char.facing = 'right'; char.x += SPEED * dt; char.phase += dt * 9;
+        const tgt = ROOM.x + ROOM.w / 2;
+        if (char.x >= tgt) {
+          char.x = tgt; char.facing = 'front'; char.state = 'asking'; char.phase = 0;
+          bubbleText = 'Elevator going up?'; bubblePop = 0.18;
+          hint.textContent = '\u2191 up  \u00b7  \u2193 down'; hint.style.opacity = '1';
+        }
+        break;
+      }
+
+      case 'asking': char.facing = 'front'; break;
+
+      case 'announce':
+        char.facing = 'front'; stateTimer += dt;
+        if (stateTimer >= ANNOUNCE_DUR) { char.state = 'settle'; stateTimer = 0; }
+        break;
+
+      case 'settle':
+        char.facing = 'front'; stateTimer += dt;
+        if (stateTimer >= SETTLE_DUR) {
+          floor += pendingDir;
+          shakeTime = SHAKE_DUR;
+          char.state = 'jolting';
+        }
+        break;
+
+      case 'jolting':
+        char.facing = 'front';
+        shakeTime = Math.max(0, shakeTime - dt);
+        if (shakeTime <= 0) { char.state = 'asking'; bubbleText = 'Elevator going up?'; bubblePop = 0.18; }
+        break;
+    }
+
+    // smoothly ease the lighting toward the current floor's darkness
+    dkCurrent += (darknessTarget() - dkCurrent) * Math.min(1, dt * 4);
+
+    const showBubble = scene === 2 && (char.state === 'asking' || char.state === 'announce');
+    bubbleAlpha = showBubble
+      ? Math.min(1, bubbleAlpha + dt / 0.3)
+      : Math.max(0, bubbleAlpha - dt / 0.3);
+    bubblePop = Math.max(0, bubblePop - dt);
+
+    char.blinkTimer -= dt;
+    if (char.blinkTimer <= 0) { char.blink = 0.12; char.blinkTimer = 2.2 + Math.random() * 2.8; }
+    if (char.blink > 0) char.blink -= dt;
+  }
+
+  // ---- Draw helpers ----------------------------------------------------
+  function px(x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(R(x), R(y), R(w), R(h)); }
+
+  function roundRectPath(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function drawBorder() {
+    ctx.strokeStyle = INK; ctx.lineWidth = 1.5;
+    ctx.strokeRect(ROOM.x + 0.5, ROOM.y + 0.5, ROOM.w, ROOM.h);
+  }
+  function drawFloor() {
+    ctx.strokeStyle = INK; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(ROOM.x, GROUND + 0.5); ctx.lineTo(ROOM.x + ROOM.w, GROUND + 0.5); ctx.stroke();
+  }
+
+  function drawElevator() {   // scene 1 only, always lit
+    ctx.strokeStyle = '#111'; ctx.lineWidth = 2;
+    ctx.strokeRect(ELE.x + 0.5, ELE.y + 0.5, ELE.w, ELE.h);
+    const dw = 18;
+    [ELE.x, ELE.x + ELE.w - dw].forEach(dx => {
+      ctx.strokeRect(dx + 0.5, ELE.y + 0.5, dw, ELE.h);
+      ctx.beginPath();
+      ctx.moveTo(dx + dw / 2 + 0.5, ELE.y + 6);
+      ctx.lineTo(dx + dw / 2 + 0.5, ELE.y + ELE.h - 6);
+      ctx.stroke();
+    });
+    ctx.lineWidth = 1;
+    ctx.strokeRect(ELE.x + dw + 8.5, ELE.y + 12.5, ELE.w - 2 * (dw + 8), ELE.h - 18);
+    px(ELE.cx - 10, ELE.y + 18, 20, 5, '#111');
+
+    const dispW = 46, dispH = 26, dx = R(ELE.cx - dispW / 2), dy = ELE.y - dispH - 10;
+    px(dx, dy, dispW, dispH, '#111');
+    ctx.fillStyle = '#fff'; ctx.font = '700 20px ui-monospace, Menlo, Consolas, monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('8', dx + dispW / 2, dy + dispH / 2 + 1);
+
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(BTN.x + 0.5, BTN.y + 0.5, BTN.w, BTN.h);
+    ctx.beginPath(); ctx.arc(BTN.cx, BTN.cy, 4, 0, Math.PI * 2);
+    if (buttonLit) { ctx.fillStyle = '#111'; ctx.fill(); } else { ctx.stroke(); }
+  }
+
+  function drawFloorIndicator() {   // dev readout — stays legible at any depth
+    const label = floorLabel(floor);
+    if (label === null) return;
+    const fw = 44, fh = 28, fx = ROOM.x + 16, fy = ROOM.y + 16;
+    px(fx, fy, fw, fh, INK);
+    ctx.fillStyle = '#fff'; ctx.font = '700 18px ui-monospace, Menlo, Consolas, monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(label, fx + fw / 2, fy + fh / 2 + 1);
+  }
+
+  function drawBubble() {
+    if (bubbleAlpha <= 0) return;
+    const bw = 320, bh = 92, bx = ROOM.x + ROOM.w / 2 - bw / 2, by = ROOM.y + 26;
+    const cx = bx + bw / 2, cy = by + bh / 2;
+    const s = 1 - 0.12 * (bubblePop / 0.18);
+
+    ctx.save();
+    ctx.globalAlpha = bubbleAlpha;
+    ctx.translate(cx, cy); ctx.scale(s, s); ctx.translate(-cx, -cy);
+
+    roundRectPath(bx, by, bw, bh, 16);
+    ctx.fillStyle = BG; ctx.fill();
+    ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.stroke();
+
+    const tx = ROOM.x + ROOM.w / 2, ty = by + bh;
+    ctx.beginPath();
+    ctx.moveTo(tx - 13, ty - 1); ctx.lineTo(tx + 13, ty - 1); ctx.lineTo(tx, ty + 18); ctx.closePath();
+    ctx.fillStyle = BG; ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(tx - 13, ty - 1); ctx.lineTo(tx, ty + 18); ctx.lineTo(tx + 13, ty - 1); ctx.stroke();
+
+    // text: dark when lit, light when dark; fades only past B20, never the eyes
+    const n = floor < 0 ? -floor : 0;
+    const textFade = 1 - Math.min(1, Math.max(0, (n - 20) / 8));
+    ctx.globalAlpha = bubbleAlpha * textFade;
+    ctx.fillStyle = dkCurrent > 0.45 ? '#fff' : INK;
+    ctx.font = '500 23px system-ui, -apple-system, "Segoe UI", sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    if ('letterSpacing' in ctx) ctx.letterSpacing = '3px';
+    ctx.fillText(bubbleText, cx + 1.5, cy + 1);
+    if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+    ctx.restore();
+  }
+
+  function drawChar() {
+    if (char.alpha <= 0) return;
+    const moving  = char.state === 'walking' || char.state === 'walking2' || char.state === 'boarding';
+    const resting = !moving;
+    const p = char.phase;
+
+    ctx.save();
+    ctx.globalAlpha = char.alpha;
+    ctx.translate(R(char.x), R(char.feetY));
+    ctx.scale(char.scale, char.scale);
+
+    const bob = resting ? Math.sin(clock * 1.8) * 1.2 : -Math.abs(Math.sin(p)) * 2;
+
+    const legW = 2 * U, legTopY = -4 * U;
+    [{ base: -1.6 * U, ph: p }, { base: 1.6 * U, ph: p + Math.PI }].forEach(L => {
+      const swing = moving ? Math.sin(L.ph) * U : 0;
+      const lift  = moving ? Math.max(0, Math.sin(L.ph)) * 1.5 * U : 0;
+      px(L.base - legW / 2 + swing, legTopY, legW, 4 * U - lift, INK);
+    });
+
+    const bodyW = 6 * U, bodyH = 6 * U, bodyY = -10 * U + bob;
+    px(-bodyW / 2, bodyY, bodyW, bodyH, INK);
+    const headW = 5 * U, headH = 5 * U, headY = bodyY - headH;
+    px(-headW / 2, headY, headW, headH, INK);
+
+    // eyes: pure white, always — never fade
+    if (char.facing !== 'away' && char.blink <= 0) {
+      const look = char.facing === 'left' ? -1.4 * U : char.facing === 'right' ? 1.4 * U : 0;
+      const eyeY = headY + 1.6 * U;
+      ctx.globalAlpha = 1;
+      px(look - 1.4 * U, eyeY, U, U, '#fff');
+      px(look + 0.4 * U, eyeY, U, U, '#fff');
+    }
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+
+  // ---- Loop ------------------------------------------------------------
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    update(dt);
+
+    // lighting for this frame
+    const bgVal  = Math.round(255 * (1 - dkCurrent));
+    const inkVal = Math.round(bgVal * 0.05);
+    BG  = `rgb(${bgVal},${bgVal},${bgVal})`;
+    INK = `rgb(${inkVal},${inkVal},${inkVal})`;
+
+    px(0, 0, W, H, BG);
+
+    let sx = 0, sy = 0;
+    if (shakeTime > 0) {
+      const e   = SHAKE_DUR - shakeTime;
+      const amp = SHAKE_AMP * (shakeTime / SHAKE_DUR);
+      sy = Math.sin(e * 19) * amp;
+      sx = Math.sin(e * 31) * amp * 0.3;
+    }
+    ctx.save();
+    ctx.translate(sx, sy);
+
+    drawBorder();
+    if (scene === 1) {
+      ctx.globalAlpha = s1Alpha; drawFloor(); drawElevator(); ctx.globalAlpha = 1;
+      drawChar();
+    } else {
+      ctx.globalAlpha = s2Alpha; drawFloor(); ctx.globalAlpha = 1;
+      drawFloorIndicator();
+      drawChar();
+      drawBubble();
+    }
+    ctx.restore();
+
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
