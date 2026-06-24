@@ -86,6 +86,12 @@
   // colours recomputed each frame from dkCurrent
   let BG = '#fff', INK = '#111';
 
+  // scene-1 painted background (designer art). bump ?v= when you re-export.
+  const scene1Img = new Image();
+  let bgReady = false;
+  scene1Img.onload = () => { bgReady = true; };
+  scene1Img.src = 'assets/scene1.png?v=1';
+
   const floorLabel = f => f > 0 ? String(f) : f < 0 ? 'B' + (-f) : null;
 
   // descent darkness: eased, complete at B20
@@ -367,11 +373,15 @@
     ctx.save();
     ctx.translate(sx, sy);
 
-    drawBorder();
     if (scene === 1) {
-      ctx.globalAlpha = s1Alpha; drawFloor(); drawElevator(); ctx.globalAlpha = 1;
-      drawChar();
+      ctx.globalAlpha = s1Alpha;
+      if (bgReady) ctx.drawImage(scene1Img, 0, 0, W, H);   // your painted lobby
+      else { drawFloor(); drawElevator(); }                 // fallback if art missing
+      ctx.globalAlpha = 1;
+      drawBorder();                                         // keyline stays for the transition
+      drawChar();                                           // character animates on top
     } else {
+      drawBorder();
       ctx.globalAlpha = s2Alpha; drawFloor(); ctx.globalAlpha = 1;
       drawFloorIndicator();
       drawChar();
