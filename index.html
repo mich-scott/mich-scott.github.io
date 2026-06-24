@@ -317,7 +317,7 @@
   .pcard[data-live] .thumb{ border-color:color-mix(in srgb, var(--rc) 60%, transparent); }
 
   /* ---------- EMBEDDED APP SHELL (live project, AR-style) ---------- */
-  .app-shell{ position:fixed; inset:0; z-index:60; display:none; }
+  .app-shell{ position:fixed; inset:0; z-index:60; display:none; --app-accent:var(--a-projects); }
   .app-shell.is-open{ display:block; }
   .app-backdrop{
     position:absolute; inset:0; cursor:pointer;
@@ -331,12 +331,12 @@
     transform:translate(-50%,-50%) scale(.95);
     width:min(1120px,92vw); height:min(740px,86vh);
     display:flex; flex-direction:column;
-    border:1px solid color-mix(in srgb, var(--a-projects) 55%, transparent);
+    border:1px solid color-mix(in srgb, var(--app-accent) 55%, transparent);
     border-radius:14px; overflow:hidden; background:#06080c;
     box-shadow:
-      0 0 0 1px color-mix(in srgb, var(--a-projects) 22%, transparent),
-      0 36px 130px -30px color-mix(in srgb, var(--a-projects) 60%, transparent),
-      0 0 90px -20px color-mix(in srgb, var(--a-projects) 40%, transparent);
+      0 0 0 1px color-mix(in srgb, var(--app-accent) 22%, transparent),
+      0 36px 130px -30px color-mix(in srgb, var(--app-accent) 60%, transparent),
+      0 0 90px -20px color-mix(in srgb, var(--app-accent) 40%, transparent);
     opacity:0; transition:opacity .45s var(--ease), transform .45s var(--ease);
   }
   .app-shell.is-open .app-screen{
@@ -347,35 +347,35 @@
 
   .app-bar{
     display:flex; align-items:center; gap:12px; padding:11px 15px;
-    background:color-mix(in srgb, var(--a-projects) 9%, #0a0e13);
-    border-bottom:1px solid color-mix(in srgb, var(--a-projects) 28%, transparent);
+    background:color-mix(in srgb, var(--app-accent) 9%, #0a0e13);
+    border-bottom:1px solid color-mix(in srgb, var(--app-accent) 28%, transparent);
   }
-  .app-dot{ width:8px; height:8px; border-radius:50%; background:var(--a-projects); box-shadow:0 0 10px var(--a-projects); }
+  .app-dot{ width:8px; height:8px; border-radius:50%; background:var(--app-accent); box-shadow:0 0 10px var(--app-accent); }
   .app-name{ font-family:var(--mono); font-size:12px; letter-spacing:.18em; text-transform:uppercase; color:var(--ink); }
   .app-live{
     font-family:var(--mono); font-size:9px; letter-spacing:.2em; text-transform:uppercase;
-    color:color-mix(in srgb, var(--a-projects) 80%, #fff);
-    border:1px solid color-mix(in srgb, var(--a-projects) 40%, transparent);
+    color:color-mix(in srgb, var(--app-accent) 80%, #fff);
+    border:1px solid color-mix(in srgb, var(--app-accent) 40%, transparent);
     border-radius:100px; padding:2px 8px;
   }
   .app-ext{
     margin-left:auto; font-family:var(--mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase;
     color:var(--muted); text-decoration:none; padding:6px 4px; transition:.2s var(--ease);
   }
-  .app-ext:hover,.app-ext:focus-visible{ color:color-mix(in srgb, var(--a-projects) 85%, #fff); outline:none; }
+  .app-ext:hover,.app-ext:focus-visible{ color:color-mix(in srgb, var(--app-accent) 85%, #fff); outline:none; }
   .app-off{
     font-family:var(--mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase;
-    background:none; border:1px solid color-mix(in srgb, var(--a-projects) 35%, transparent);
+    background:none; border:1px solid color-mix(in srgb, var(--app-accent) 35%, transparent);
     color:var(--muted); border-radius:8px; padding:6px 13px; cursor:pointer; transition:.2s var(--ease);
   }
-  .app-off:hover,.app-off:focus-visible{ color:#fff; border-color:var(--a-projects); box-shadow:0 0 16px -4px var(--a-projects); outline:none; }
+  .app-off:hover,.app-off:focus-visible{ color:#fff; border-color:var(--app-accent); box-shadow:0 0 16px -4px var(--app-accent); outline:none; }
   .app-frame{ position:relative; flex:1; background:#06080c; }
   #appFrame{ width:100%; height:100%; border:0; display:block; background:#06080c; }
   .app-scan{
     position:absolute; inset:0; pointer-events:none;
-    background:repeating-linear-gradient(to bottom, color-mix(in srgb,var(--a-projects) 8%, transparent) 0 1px, transparent 1px 3px);
+    background:repeating-linear-gradient(to bottom, color-mix(in srgb,var(--app-accent) 8%, transparent) 0 1px, transparent 1px 3px);
     mix-blend-mode:screen; opacity:.22;
-    box-shadow:inset 0 0 60px -10px color-mix(in srgb,var(--a-projects) 40%, transparent);
+    box-shadow:inset 0 0 60px -10px color-mix(in srgb,var(--app-accent) 40%, transparent);
   }
   @media (prefers-reduced-motion:reduce){ .app-shell.is-open .app-screen{ animation:none; } }
 
@@ -578,6 +578,13 @@ const PROJECTS = [
   { title:"Project 6" },
 ];
 
+/* ---- Games shown in the Games-room carousel ---- */
+const GAMES = [
+  { title:"Elev8or", url:"https://mich-scott.github.io/games/elev8or" },
+  { title:"Game 2" },
+  { title:"Game 3" },
+];
+
 const ROOMS = [
   { id:"door", title:SITE.name, accent:"--a-door", door:true,
     role:SITE.role,
@@ -592,6 +599,7 @@ const ROOMS = [
 
   { id:"projects", title:"Projects", accent:"--a-projects",
     blurb:"Things built, shipped, and taken apart to see how they work.",
+    carousel:PROJECTS,
     x:0, y:0, z:-SPACING*2, ry:0, plan:{x:50,y:62}, label:"Projects",
     tag:"Main hall · 02", now:"Projects", links:{ back:"resume", left:"art", right:"music", forward:"games" } },
 
@@ -606,7 +614,8 @@ const ROOMS = [
     tag:"East wing · 02", now:"Music", links:{ left:"projects" } },
 
   { id:"games", title:"Games", accent:"--a-games",
-    blurb:"Playable prototypes and small interactive worlds. Arriving later.",
+    blurb:"Playable prototypes and small interactive worlds.",
+    carousel:GAMES,
     x:0, y:0, z:-SPACING*3, ry:0, plan:{x:50,y:30}, label:"Games",
     tag:"Back room · 03", now:"Games", links:{ back:"projects" } },
 ];
@@ -635,14 +644,15 @@ ROOMS.forEach((r,i)=>{
     inner = `<div class="eyebrow door-role">${r.role}</div>
        <h1 class="title door-name">${r.title}</h1>
        <p class="blurb door-stmt">${r.stmt}</p>`;
-  } else if(r.id === "projects"){
+  } else if(r.carousel){
+    const items = r.carousel;
     inner = `<div class="eyebrow">${r.label}</div>
-       <h2 class="title proj-title" id="projTitle" role="button" tabindex="0" aria-expanded="false" aria-controls="projCarousel">${r.title}</h2>
+       <h2 class="title proj-title" id="title-${r.id}" role="button" tabindex="0" aria-expanded="false" aria-controls="carousel-${r.id}">${r.title}</h2>
        <p class="blurb proj-blurb">${r.blurb}</p>
        <div class="proj-hint">&#9656; click to open</div>
-       <div class="carousel" id="projCarousel">
-         <div class="stage" id="carStage">
-           ${PROJECTS.map((p,i)=>`
+       <div class="carousel" id="carousel-${r.id}">
+         <div class="stage" id="stage-${r.id}">
+           ${items.map((p,i)=>`
              <button class="pcard" data-i="${i}"${p.url ? ' data-live="1"' : ''} aria-label="${p.title}${p.url ? ' — live app" ' : '" '}>
                <span class="thumb"><span class="pnum">${String(i+1).padStart(2,"0")}</span></span>
                <span class="pname">${p.title}</span>
@@ -651,9 +661,9 @@ ROOMS.forEach((r,i)=>{
          </div>
          <div class="projector"></div>
          <div class="carnav">
-           <button class="carbtn" id="carPrev" aria-label="Previous project">&lsaquo;</button>
-           <span class="carcount" id="carCount">01 / ${PROJECTS.length}</span>
-           <button class="carbtn" id="carNext" aria-label="Next project">&rsaquo;</button>
+           <button class="carbtn" id="prev-${r.id}" aria-label="Previous">&lsaquo;</button>
+           <span class="carcount" id="count-${r.id}">01 / ${items.length}</span>
+           <button class="carbtn" id="next-${r.id}" aria-label="Next">&rsaquo;</button>
          </div>
        </div>`;
   } else {
@@ -668,14 +678,17 @@ ROOMS.forEach((r,i)=>{
   world.appendChild(el);
 });
 
-/* ---------- projects carousel (coverflow) ---------- */
-function initCarousel(){
-  const stage = document.getElementById("carStage");
+/* ---------- carousels (coverflow) — one per room that declares `carousel` ---------- */
+const CAROUSELS = {};   // roomId -> { goTo, active, close }
+
+function initCarousel(roomId){
+  const stage = document.getElementById("stage-"+roomId);
   if(!stage) return;
+  const items = byId[roomId].carousel;
   const cards = [...stage.querySelectorAll(".pcard")];
-  const prev  = document.getElementById("carPrev");
-  const next  = document.getElementById("carNext");
-  const count = document.getElementById("carCount");
+  const prev  = document.getElementById("prev-"+roomId);
+  const next  = document.getElementById("next-"+roomId);
+  const count = document.getElementById("count-"+roomId);
   const N = cards.length;
   let active = 0;
 
@@ -701,33 +714,33 @@ function initCarousel(){
   cards.forEach((c,i)=> c.addEventListener("click", e=>{
     e.stopPropagation();
     if(i !== active){ goTo(i); return; }
-    const p = PROJECTS[i];
+    const p = items[i];
     if(p && p.url) openApp(p);
   }));
   prev.addEventListener("click", e=>{ e.stopPropagation(); goTo(active-1); });
   next.addEventListener("click", e=>{ e.stopPropagation(); goTo(active+1); });
 
   layout();
-  window.__carousel = { goTo, get active(){ return active; } };
 
   // title-gated reveal
-  const room  = document.getElementById("room-projects");
-  const title = document.getElementById("projTitle");
+  const room  = document.getElementById("room-"+roomId);
+  const title = document.getElementById("title-"+roomId);
   function setOpen(open){
     room.classList.toggle("proj-open", open);
     title.setAttribute("aria-expanded", open ? "true" : "false");
   }
   function toggle(){ setOpen(!room.classList.contains("proj-open")); }
   title.addEventListener("click", e=>{
-    if(current !== "projects") return;        // not arrived yet → let it bubble and navigate
+    if(current !== roomId) return;            // not arrived yet → let it bubble and navigate
     e.stopPropagation(); toggle();
   });
   title.addEventListener("keydown", e=>{
-    if((e.key==="Enter" || e.key===" ") && current==="projects"){ e.preventDefault(); e.stopPropagation(); toggle(); }
+    if((e.key==="Enter" || e.key===" ") && current===roomId){ e.preventDefault(); e.stopPropagation(); toggle(); }
   });
-  window.__projects = { close:()=>setOpen(false) };
+
+  CAROUSELS[roomId] = { goTo, get active(){ return active; }, close:()=>setOpen(false) };
 }
-initCarousel();
+ROOMS.filter(r=>r.carousel).forEach(r=> initCarousel(r.id));
 
 /* ---------- embedded app shell (live project, AR-style) ---------- */
 const appShell = document.getElementById("appShell");
@@ -738,6 +751,7 @@ const appExt   = document.getElementById("appExt");
 let appOpen = false;
 
 function openApp(p){
+  appShell.style.setProperty("--app-accent", "var(" + byId[current].accent + ")");
   appName.textContent = p.title;
   appExt.href = p.url;
   appFrame.src = p.url;                     // lazy: only loads now
@@ -807,7 +821,7 @@ function focus(id, instant){
     world.style.transform = cameraFor(r);
   }
   current = id;
-  if(id !== "projects" && window.__projects) window.__projects.close();
+  Object.keys(CAROUSELS).forEach(rid=>{ if(rid !== id) CAROUSELS[rid].close(); });
   updateHUD();
   document.getElementById("hint").classList.add("hide");
 }
@@ -857,14 +871,14 @@ window.addEventListener("keydown", e=>{
 
   if(appOpen){ if(k==="escape") closeApp(); return; }
 
-  if(k==="escape" && current==="projects" && window.__projects){ window.__projects.close(); return; }
+  if(k==="escape" && CAROUSELS[current]){ CAROUSELS[current].close(); return; }
 
   // when focus is inside the carousel, left/right flip projects instead of changing rooms
   const inCar = document.activeElement && document.activeElement.closest
     ? document.activeElement.closest(".carousel") : null;
-  if(inCar && current==="projects" && window.__carousel){
-    if(k==="arrowleft"||k==="a"){ e.preventDefault(); window.__carousel.goTo(window.__carousel.active-1); return; }
-    if(k==="arrowright"||k==="d"){ e.preventDefault(); window.__carousel.goTo(window.__carousel.active+1); return; }
+  if(inCar && CAROUSELS[current]){
+    if(k==="arrowleft"||k==="a"){ e.preventDefault(); CAROUSELS[current].goTo(CAROUSELS[current].active-1); return; }
+    if(k==="arrowright"||k==="d"){ e.preventDefault(); CAROUSELS[current].goTo(CAROUSELS[current].active+1); return; }
   }
 
   if(["arrowup","w"].includes(k)){ e.preventDefault(); go("forward"); }
