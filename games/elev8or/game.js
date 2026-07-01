@@ -61,30 +61,42 @@
 
   const AV = 'v=1';                   // bump when you re-export a note (matches your ?v= convention)
   const NOTE_DIR = 'assets/piano/';   // folder your bounced one-shots live in — change here only
-  // Only the notes you've bounced are listed. Add a line as you export each new pitch.
-  // Filenames are case-sensitive on GitHub Pages — these match your capitalised B2/Bb2.
+  // Keys are note+octave and match filenames exactly (case-sensitive on GitHub Pages).
+  // Bb2 and Bb3 are DIFFERENT pitches/files — the sequence spans nearly two octaves.
   const NOTE_FILES = {
-    'B':  'B2.wav',                   // floor 0 resting pitch (natural 3rd over G)
-    'Bb': 'Bb2.wav',                  // descent pitch — slot 2 flips to this going down
-    // 'G':  'G2.wav',
-    // 'D':  'D3.wav',
-    // 'Eb': 'Eb3.wav',
-    // 'A':  'A2.wav',
-    // 'C':  'C3.wav',
+    'B2':  'B2.wav',                  // floor 0 resting pitch (natural 3rd over G)
+    'Bb2': 'Bb2.wav',                 // descent pulse — slot 2 flips B2 -> Bb2 going down
+    'G2':  'G2.wav',
+    'D3':  'D3.wav',
+    'Eb3': 'Eb3.wav',
+    'A3':  'A3.wav',
+    'Bb3': 'Bb3.wav',
+    'C4':  'C4.wav',
+    'D4':  'D4.wav',
   };
 
   // --- the 8-slot sequence, as data. index 1 is the pulse slot. -----------
   const REST = null;
-  const PATTERN_0 = [REST,'B', REST,REST,REST,REST,REST,REST];  // floor 0: B natural pulsing on slot 2
-  const PATTERN_A = ['G','Bb','D','Eb','A','Bb','C','D'];        // descent target, variant A
-  const PATTERN_B = ['G','Bb','D','Eb','A','Bb','D','Eb'];       // descent target, variant B (unused yet)
-  // floor (negative) at which each slot first sounds during descent — tune by ear.
-  // notes with no file yet stay silent regardless, so you can tune this before bouncing them.
-  const REVEAL    = [ -4, -1, -6, -8, -10, -12, -14, -16 ];
+  const PATTERN_0 = [REST,'B2', REST,REST,REST,REST,REST,REST];            // floor 0: B2 pulsing on slot 2
+  const PATTERN_A = ['G2','Bb2','D3','Eb3','A3','Bb3','C4','D4'];          // full underworld sequence (ascending line)
+  // const PATTERN_B = ['G2','Bb2','D3','Eb3','A3','Bb3','D4','Eb4'];      // alt ending — needs Eb4.wav; parked with the A/B chooser
+
+  // floor at which each slot first sounds during descent — the descent's shape, tune by ear.
+  // values are internal (negative) floors; the B-label + note each governs is noted alongside.
+  const REVEAL = [
+    -3,   // slot 0  G2   → in at B3
+    -1,   // slot 1  Bb2  → in at B1  (the pulse; first thing you hear going down)
+    -5,   // slot 2  D3   → in at B5
+    -7,   // slot 3  Eb3  → in at B7
+    -9,   // slot 4  A3   → in at B9
+    -11,  // slot 5  Bb3  → in at B11
+    -13,  // slot 6  C4   → in at B13
+    -15,  // slot 7  D4   → in at B15 (full sequence complete)
+  ];
 
   function activeNote(step, fl) {     // which pitch (or REST) sounds on this slot right now
-    if (fl >= 0) return fl === 0 ? PATTERN_0[step] : REST;   // 0 = B pulse; ascent = TBD (heaven)
-    const pat = PATTERN_A;            // TODO: branch to PATTERN_B when the A/B chooser is designed
+    if (fl >= 0) return fl === 0 ? PATTERN_0[step] : REST;   // 0 = B2 pulse; ascent = TBD (heaven)
+    const pat = PATTERN_A;
     return fl <= REVEAL[step] ? pat[step] : REST;
   }
 
@@ -115,7 +127,13 @@
         if (!res.ok) throw new Error('HTTP ' + res.status);   // 404 = no file at this exact path/case
         const arr = await res.arrayBuffer();
         buffers[name] = await audioCtx.decodeAudioData(arr);
-        console.log('[audio] loaded', name, '<-', url, '(' + buffers[name].duration.toFixed(2) + 's)');
+        const d = buffers[name].getChannelData(0);
+        let pk = 0; for (let i = 0; i < d.length; i++) { const v = Math.abs(d[i]); if (v > pk) pk = v; }
+        const dur = buffers[name].duration.toFixed(2);
+        if (pk < 0.0005)
+          console.warn('[audio]', name, 'decoded but is SILENT (peak\u22480) <-', url, '\u2014 re-export; the note never sounded into the render');
+        else
+          console.log('[audio] loaded', name, '<-', url, '(' + dur + 's, peak ' + pk.toFixed(3) + ')');
       } catch (e) {
         console.warn('[audio] could NOT load', name, '<-', url, '—', e.message, '(slot stays silent)');
       }
