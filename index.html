@@ -1,931 +1,516 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Portfolio — Spatial Navigation</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Elev8 || OR</title>
 <style>
-  :root{
-    --bg:#0a0c11;
-    --bg-deep:#06070a;
-    --ink:#eceef3;
-    --muted:#838b9c;
-    --faint:#525a6b;
-
-    --a-door:#cbb892;
-    --a-resume:#6f93c4;
-    --a-projects:#46b39d;
-    --a-art:#d2719f;
-    --a-music:#e2a04e;
-    --a-games:#9a86e0;
-
-    --display:"Syne","Syne Fallback",system-ui,sans-serif;
-    --body:"Inter",system-ui,-apple-system,sans-serif;
-    --mono:"Space Mono","SFMono-Regular",ui-monospace,monospace;
-
-    --rw:560px;
-    --rh:400px;
-    --ease:cubic-bezier(.66,0,.18,1);
+  :root { --ink: #111; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%;
+    background: #ececec;
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    color: #555;
   }
-
-  *{box-sizing:border-box;margin:0;padding:0}
-  html,body{height:100%}
-  body{
-    font-family:var(--body);
-    background:var(--bg-deep);
-    color:var(--ink);
-    overflow:hidden;
-    -webkit-font-smoothing:antialiased;
-    text-rendering:optimizeLegibility;
+  .stage {
+    min-height: 100%;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 12px; padding: 24px;
   }
-
-  /* ---------- 3D SCENE ---------- */
-  .scene{
-    position:fixed; inset:0;
-    perspective:1000px;
-    perspective-origin:50% 46%;
-    overflow:hidden;
-    background:radial-gradient(120% 90% at 50% 32%, #11151d 0%, var(--bg) 46%, var(--bg-deep) 100%);
+  canvas {
+    width: min(86vw, 86vh, 620px);
+    height: auto; aspect-ratio: 1 / 1;
+    background: #fff;
+    image-rendering: pixelated;
+    box-shadow: 0 18px 40px rgba(0,0,0,0.10);
   }
-  /* faint drifting atmosphere */
-  .scene::before{
-    content:""; position:absolute; inset:-20%;
-    background:
-      radial-gradient(38% 50% at 32% 38%, rgba(70,90,130,.07), transparent 70%),
-      radial-gradient(40% 46% at 70% 64%, rgba(120,80,120,.06), transparent 72%);
-    animation:fog 34s ease-in-out infinite alternate;
-    pointer-events:none;
+  .caption {
+    font-size: 12px; letter-spacing: 0.35em;
+    text-transform: uppercase; color: #999; user-select: none;
   }
-  @keyframes fog{ from{transform:translate3d(0,0,0)} to{transform:translate3d(3%,-2%,0)} }
-
-  .world{
-    position:absolute; inset:0;
-    transform-style:preserve-3d;
-    transform:translateZ(0);
-    transition:transform 1.15s var(--ease);
-    will-change:transform;
-  }
-
-  /* perspective floor — softened to a whisper */
-  .floor{
-    position:absolute; left:50%; top:50%;
-    width:3200px; height:9200px;
-    margin:-4600px 0 0 -1600px;
-    transform:translate3d(0,240px,-1950px) rotateX(90deg);
-    background-image:
-      linear-gradient(rgba(255,255,255,.032) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,255,255,.032) 1px, transparent 1px);
-    background-size:140px 140px;
-    -webkit-mask-image:radial-gradient(58% 52% at 50% 60%, #000 0%, rgba(0,0,0,.4) 52%, transparent 82%);
-            mask-image:radial-gradient(58% 52% at 50% 60%, #000 0%, rgba(0,0,0,.4) 52%, transparent 82%);
-    pointer-events:none;
-  }
-
-  /* ---------- ROOMS AS APPARITIONS ---------- */
-  .room{
-    position:absolute; left:50%; top:50%;
-    width:var(--rw); height:var(--rh);
-    margin:calc(var(--rh)/-2) 0 0 calc(var(--rw)/-2);
-    display:flex; align-items:center; justify-content:center;
-    cursor:pointer;
-    /* no border, no fill, no radius, no shadow — it is a place, not an object */
-  }
-
-  .haze{ /* the pool of light that IS the room */
-    position:absolute; inset:-34% -22%;
-    background:radial-gradient(ellipse 58% 54% at 50% 52%,
-      color-mix(in srgb, var(--rc) 80%, transparent) 0%,
-      color-mix(in srgb, var(--rc) 26%, transparent) 36%,
-      transparent 70%);
-    opacity:.1275;
-    filter:blur(15px);
-    pointer-events:none;
-    animation:breathe var(--bd,9s) ease-in-out infinite;
-    animation-delay:var(--delay,0s);
-    transition:opacity 1s var(--ease);
-  }
-  @keyframes breathe{
-    0%,100%{ transform:scale(1);   filter:blur(15px) brightness(1); }
-    50%    { transform:scale(1.06);filter:blur(19px) brightness(1.22); }
-  }
-
-  .seat{ /* near-invisible deepening of space behind the text, for contrast */
-    position:absolute; inset:6% 4%;
-    background:radial-gradient(ellipse 56% 58% at 50% 52%, rgba(4,6,10,.6) 0%, rgba(4,6,10,.24) 46%, transparent 72%);
-    filter:blur(12px);
-    opacity:0;
-    pointer-events:none;
-    transition:opacity 1s var(--ease);
-  }
-
-  .content{
-    position:relative; z-index:2;
-    text-align:center;
-    padding:0 36px;
-    filter:blur(8.49px);
-    opacity:.4;
-    transform:translateY(6px);
-    transition:filter 1.1s var(--ease), opacity 1.1s var(--ease), transform 1.1s var(--ease);
-  }
-
-  .room.is-active{ z-index:3; }
-  .room.is-active .content{ filter:blur(0); opacity:1; transform:none; }
-  .room.is-active .haze{ opacity:.306; }
-  .room.is-active .seat{ opacity:1; }
-
-  .eyebrow{
-    font-family:var(--mono);
-    font-size:11px; letter-spacing:.26em; text-transform:uppercase;
-    color:var(--rc, var(--muted));
-    opacity:.85;
-    margin-bottom:18px;
-  }
-  .title{
-    font-family:var(--display); font-weight:800;
-    font-size:clamp(38px,5vw,60px);
-    line-height:.98; letter-spacing:-.02em;
-    color:#f4f5f9;
-    text-shadow:
-      0 0 26px color-mix(in srgb, var(--rc) 60%, transparent),
-      0 0 70px color-mix(in srgb, var(--rc) 32%, transparent);
-  }
-  .blurb{
-    color:rgba(236,238,243,.82);
-    font-size:15px; line-height:1.6;
-    max-width:38ch; margin:20px auto 0;
-    text-shadow:0 2px 18px rgba(0,0,0,.55);
-  }
-  .tagline{
-    font-family:var(--mono);
-    font-size:10px; letter-spacing:.24em; text-transform:lowercase;
-    color:color-mix(in srgb, var(--rc) 70%, var(--faint));
-    margin-top:24px; opacity:.7;
-  }
-
-  /* door / hero apparition */
-  .door-role{ color:var(--a-door); margin-bottom:22px; }
-  .title.door-name{ font-size:clamp(46px,6.4vw,76px); letter-spacing:-.03em; }
-  .door-stmt{ max-width:44ch; margin-top:24px; }
-
-  /* ---------- PROJECTS HOLOGRAM CAROUSEL ---------- */
-  .carousel{
-    position:relative;
-    width:100%; height:296px;
-    margin-top:18px;
-    perspective:900px;
-    display:none;                   /* revealed by clicking the title */
-    pointer-events:none;            /* enabled only when the room is active */
-  }
-  .room.is-active .carousel{ pointer-events:auto; }
-
-  /* title-gated reveal */
-  .proj-title{ cursor:pointer; transition:font-size .55s var(--ease), margin .4s var(--ease), text-shadow .35s; }
-  .room.is-active .proj-title:hover{
-    text-shadow:0 0 34px color-mix(in srgb, var(--rc) 75%, transparent), 0 0 80px color-mix(in srgb, var(--rc) 40%, transparent);
-  }
-  .proj-hint{
-    font-family:var(--mono); font-size:10px; letter-spacing:.22em; text-transform:uppercase;
-    color:color-mix(in srgb, var(--rc) 70%, var(--faint));
-    margin-top:18px; opacity:.8;
-  }
-  .room.proj-open .eyebrow,
-  .room.proj-open .proj-blurb,
-  .room.proj-open .proj-hint{ display:none; }
-  .room.proj-open .proj-title{ font-size:clamp(18px,2.2vw,24px); margin-bottom:4px; }
-  .room.proj-open .carousel{ display:block; animation:holoboot .75s var(--ease) both; }
-  @keyframes holoboot{
-    0%  { opacity:0; transform:translateY(16px) scale(.92); filter:blur(7px); }
-    55% { opacity:1; }
-    100%{ opacity:1; transform:none; filter:blur(0); }
-  }
-
-  .stage{
-    position:absolute; inset:0;
-    transform-style:preserve-3d;
-    animation:holofloat 6.5s ease-in-out infinite;
-  }
-  @keyframes holofloat{ 0%,100%{transform:translateY(0)} 50%{transform:translateY(-7px)} }
-
-  .pcard{
-    position:absolute; left:50%; top:50%;
-    width:148px; height:196px;
-    margin:-98px 0 0 -74px;
-    border:0; background:none; padding:0; cursor:pointer;
-    display:flex; flex-direction:column; gap:10px;
-    transform-style:preserve-3d;
-    transition:transform .6s var(--ease), opacity .6s var(--ease);
-    will-change:transform,opacity;
-  }
-  .thumb{
-    flex:1; position:relative; display:block; border-radius:10px; overflow:hidden;
-    background:linear-gradient(158deg,
-      color-mix(in srgb, var(--rc) 32%, transparent),
-      color-mix(in srgb, var(--rc) 7%, transparent));
-    border:1px solid color-mix(in srgb, var(--rc) 45%, transparent);
-    box-shadow:
-      0 0 26px -8px color-mix(in srgb, var(--rc) 55%, transparent),
-      inset 0 0 32px -12px color-mix(in srgb, var(--rc) 60%, transparent);
-    transition:box-shadow .6s var(--ease), border-color .6s var(--ease);
-  }
-  .thumb::before{ /* faint wireframe grid */
-    content:""; position:absolute; inset:0;
-    background-image:
-      linear-gradient(color-mix(in srgb, var(--rc) 20%, transparent) 1px, transparent 1px),
-      linear-gradient(90deg, color-mix(in srgb, var(--rc) 20%, transparent) 1px, transparent 1px);
-    background-size:22px 22px; opacity:.5;
-  }
-  .thumb::after{ /* scanlines */
-    content:""; position:absolute; inset:0; pointer-events:none;
-    background:repeating-linear-gradient(to bottom, rgba(255,255,255,.045) 0 1px, transparent 1px 3px);
-    mix-blend-mode:screen; opacity:.7;
-  }
-  .pnum{
-    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-    font-family:var(--display); font-weight:800; font-size:52px; letter-spacing:-.02em;
-    color:color-mix(in srgb, var(--rc) 65%, #eaf6f2);
-    text-shadow:0 0 22px color-mix(in srgb, var(--rc) 70%, transparent);
-    opacity:.82;
-  }
-  .pname{
-    display:block; font-family:var(--mono);
-    font-size:11px; letter-spacing:.16em; text-transform:uppercase;
-    color:var(--muted); text-align:center;
-    transition:color .6s var(--ease), text-shadow .6s var(--ease);
-  }
-  .pcard.is-front .thumb{
-    border-color:color-mix(in srgb, var(--rc) 80%, transparent);
-    box-shadow:
-      0 0 44px -6px color-mix(in srgb, var(--rc) 70%, transparent),
-      inset 0 0 44px -10px color-mix(in srgb, var(--rc) 70%, transparent);
-  }
-  .pcard.is-front .pname{
-    color:#f4fbf9; text-shadow:0 0 14px color-mix(in srgb, var(--rc) 60%, transparent);
-  }
-
-  .projector{ /* hologram emitter glow at the base */
-    position:absolute; left:50%; bottom:-2px; transform:translateX(-50%);
-    width:210px; height:54px;
-    background:radial-gradient(ellipse at 50% 100%, color-mix(in srgb, var(--rc) 42%, transparent), transparent 70%);
-    filter:blur(8px); opacity:.5; pointer-events:none;
-    animation:holoflicker 5s steps(1,end) infinite;
-  }
-  @keyframes holoflicker{ 0%,96%,100%{opacity:.5} 97%{opacity:.3} 98%{opacity:.6} 99%{opacity:.42} }
-
-  .carnav{
-    position:absolute; left:50%; bottom:-30px; transform:translateX(-50%);
-    display:flex; align-items:center; gap:20px;
-  }
-  .carbtn{
-    width:32px; height:32px; border:0; background:none; cursor:pointer; line-height:1;
-    color:color-mix(in srgb, var(--rc) 65%, var(--muted)); font-size:24px;
-    transition:.2s var(--ease);
-  }
-  .carbtn:not(:disabled):hover{ color:#fff; text-shadow:0 0 12px var(--rc); transform:scale(1.18); }
-  .carbtn:not(:disabled):focus-visible{ outline:none; color:#fff; text-shadow:0 0 12px var(--rc); }
-  .carbtn:disabled{ opacity:.22; cursor:default; }
-  .carcount{
-    font-family:var(--mono); font-size:11px; letter-spacing:.16em;
-    color:var(--muted); min-width:64px; text-align:center;
-  }
-  .pcard:focus-visible{ outline:none; }
-  .pcard:focus-visible .thumb{ border-color:#fff; box-shadow:0 0 30px -6px var(--rc); }
-
-  /* calm the hologram when you're not in the room */
-  .room:not(.is-active) .stage,
-  .room:not(.is-active) .projector{ animation:none; }
-
-  @media (max-width:760px){
-    .carousel{ height:250px; }
-    .pcard{ width:120px; height:160px; margin:-80px 0 0 -60px; }
-    .pnum{ font-size:42px; }
-  }
-  @media (prefers-reduced-motion:reduce){
-    .stage,.projector{ animation:none; }
-  }
-
-  .plaunch{
-    display:none;
-    font-family:var(--mono); font-size:10px; letter-spacing:.18em; text-transform:uppercase;
-    color:color-mix(in srgb, var(--rc) 80%, #eaf6f2);
-    text-shadow:0 0 12px color-mix(in srgb, var(--rc) 60%, transparent);
-    margin-top:2px;
-  }
-  .pcard.is-front .plaunch{ display:block; }
-  .pcard[data-live] .thumb{ border-color:color-mix(in srgb, var(--rc) 60%, transparent); }
-
-  /* ---------- EMBEDDED APP SHELL (live project, AR-style) ---------- */
-  .app-shell{ position:fixed; inset:0; z-index:60; display:none; --app-accent:var(--a-projects); }
-  .app-shell.is-open{ display:block; }
-  .app-backdrop{
-    position:absolute; inset:0; cursor:pointer;
-    background:rgba(4,6,10,.55);
-    backdrop-filter:blur(10px) saturate(.92);
-    opacity:0; transition:opacity .4s var(--ease);
-  }
-  .app-shell.is-open .app-backdrop{ opacity:1; }
-  .app-screen{
-    position:absolute; left:50%; top:50%;
-    transform:translate(-50%,-50%) scale(.95);
-    width:min(1120px,92vw); height:min(740px,86vh);
-    display:flex; flex-direction:column;
-    border:1px solid color-mix(in srgb, var(--app-accent) 55%, transparent);
-    border-radius:14px; overflow:hidden; background:#06080c;
-    box-shadow:
-      0 0 0 1px color-mix(in srgb, var(--app-accent) 22%, transparent),
-      0 36px 130px -30px color-mix(in srgb, var(--app-accent) 60%, transparent),
-      0 0 90px -20px color-mix(in srgb, var(--app-accent) 40%, transparent);
-    opacity:0; transition:opacity .45s var(--ease), transform .45s var(--ease);
-  }
-  .app-shell.is-open .app-screen{
-    opacity:1; transform:translate(-50%,-50%) scale(1);
-    animation:appboot .6s var(--ease) both;
-  }
-  @keyframes appboot{ 0%{ filter:blur(9px) brightness(1.4); } 100%{ filter:blur(0) brightness(1); } }
-
-  .app-bar{
-    display:flex; align-items:center; gap:12px; padding:11px 15px;
-    background:color-mix(in srgb, var(--app-accent) 9%, #0a0e13);
-    border-bottom:1px solid color-mix(in srgb, var(--app-accent) 28%, transparent);
-  }
-  .app-dot{ width:8px; height:8px; border-radius:50%; background:var(--app-accent); box-shadow:0 0 10px var(--app-accent); }
-  .app-name{ font-family:var(--mono); font-size:12px; letter-spacing:.18em; text-transform:uppercase; color:var(--ink); }
-  .app-live{
-    font-family:var(--mono); font-size:9px; letter-spacing:.2em; text-transform:uppercase;
-    color:color-mix(in srgb, var(--app-accent) 80%, #fff);
-    border:1px solid color-mix(in srgb, var(--app-accent) 40%, transparent);
-    border-radius:100px; padding:2px 8px;
-  }
-  .app-ext{
-    margin-left:auto; font-family:var(--mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase;
-    color:var(--muted); text-decoration:none; padding:6px 4px; transition:.2s var(--ease);
-  }
-  .app-ext:hover,.app-ext:focus-visible{ color:color-mix(in srgb, var(--app-accent) 85%, #fff); outline:none; }
-  .app-off{
-    font-family:var(--mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase;
-    background:none; border:1px solid color-mix(in srgb, var(--app-accent) 35%, transparent);
-    color:var(--muted); border-radius:8px; padding:6px 13px; cursor:pointer; transition:.2s var(--ease);
-  }
-  .app-off:hover,.app-off:focus-visible{ color:#fff; border-color:var(--app-accent); box-shadow:0 0 16px -4px var(--app-accent); outline:none; }
-  .app-frame{ position:relative; flex:1; background:#06080c; }
-  #appFrame{ width:100%; height:100%; border:0; display:block; background:#06080c; }
-  .app-scan{
-    position:absolute; inset:0; pointer-events:none;
-    background:repeating-linear-gradient(to bottom, color-mix(in srgb,var(--app-accent) 8%, transparent) 0 1px, transparent 1px 3px);
-    mix-blend-mode:screen; opacity:.22;
-    box-shadow:inset 0 0 60px -10px color-mix(in srgb,var(--app-accent) 40%, transparent);
-  }
-  @media (prefers-reduced-motion:reduce){ .app-shell.is-open .app-screen{ animation:none; } }
-
-  /* ---------- HUD (ghosted) ---------- */
-  .vignette{position:fixed;inset:0;pointer-events:none;z-index:5;
-    background:linear-gradient(to bottom, var(--bg-deep) 0%, transparent 18%, transparent 80%, rgba(6,7,10,.9) 100%);}
-
-  .hud{position:fixed;inset:0;z-index:10;pointer-events:none}
-  .hud > *{pointer-events:auto}
-
-  .brand{
-    position:fixed; left:30px; top:26px;
-    font-family:var(--mono); font-size:11px; letter-spacing:.24em; text-transform:uppercase;
-    color:var(--muted); line-height:1.8;
-    text-shadow:0 0 24px rgba(0,0,0,.6);
-  }
-  .brand b{color:var(--ink);font-weight:700}
-  .brand span{display:block;color:var(--faint);font-size:10px;letter-spacing:.2em}
-
-  .jump{position:fixed; right:26px; top:24px; display:flex; flex-direction:column; align-items:flex-end; gap:8px}
-  .jump button{
-    font-family:var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase;
-    background:none; border:none; color:var(--faint); cursor:pointer;
-    padding:3px 0; transition:color .3s, text-shadow .3s; display:flex;align-items:center;gap:9px;
-  }
-  .jump button:hover,.jump button:focus-visible{color:var(--ink);outline:none}
-  .jump button .dot{width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.4;transition:.3s}
-  .jump button.active{color:var(--cur,var(--ink));text-shadow:0 0 16px var(--cur)}
-  .jump button.active .dot{opacity:1;background:var(--cur);box-shadow:0 0 8px var(--cur)}
-
-  /* direction pad — ghost glyphs, no boxes */
-  .pad{
-    position:fixed; left:50%; bottom:34px; transform:translateX(-50%);
-    display:grid; grid-template-columns:repeat(3,48px); grid-template-rows:repeat(2,44px);
-    gap:4px; align-items:center; justify-items:center;
-  }
-  .pad .d{
-    width:48px;height:44px; border:none; background:none;
-    color:var(--muted); font-size:19px; cursor:pointer;
-    display:flex;align-items:center;justify-content:center;
-    position:relative; transition:.25s var(--ease);
-    text-shadow:0 0 1px rgba(0,0,0,.5);
-  }
-  .pad .d::before{ /* soft bloom on hover */
-    content:""; position:absolute; inset:-6px; border-radius:50%;
-    background:radial-gradient(closest-side, color-mix(in srgb,var(--cur) 55%,transparent), transparent 70%);
-    opacity:0; transition:opacity .25s; z-index:-1;
-  }
-  .pad .d:disabled{opacity:.18;cursor:default}
-  .pad .d:not(:disabled):hover{color:var(--cur);transform:translateY(-3px);text-shadow:0 0 14px var(--cur)}
-  .pad .d:not(:disabled):hover::before{opacity:.5}
-  .pad .d:focus-visible{outline:none;color:var(--cur);text-shadow:0 0 14px var(--cur)}
-  .pad .d:focus-visible::before{opacity:.5}
-  .pad .up{grid-column:2;grid-row:1}
-  .pad .left{grid-column:1;grid-row:2}
-  .pad .down{grid-column:2;grid-row:2}
-  .pad .right{grid-column:3;grid-row:2}
-  .pad .d[data-label]:not(:disabled):hover::after{
-    content:attr(data-label);
-    position:absolute; bottom:calc(100% + 6px); left:50%; transform:translateX(-50%);
-    font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
-    color:var(--cur);white-space:nowrap;text-shadow:0 0 12px rgba(0,0,0,.8);
-  }
-
-  /* floor plan — frameless drifting mist */
-  .plan{
-    position:fixed; left:28px; bottom:26px; width:142px;
-    padding:14px 14px 10px;
-    background:radial-gradient(120% 130% at 50% 38%, rgba(12,15,22,.45), transparent 82%);
-    backdrop-filter:blur(9px);
-    -webkit-mask-image:radial-gradient(125% 130% at 50% 45%, #000 52%, transparent 100%);
-            mask-image:radial-gradient(125% 130% at 50% 45%, #000 52%, transparent 100%);
-  }
-  .plan-head{
-    font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;
-    color:var(--faint);margin-bottom:9px;display:flex;justify-content:space-between;
-  }
-  .plan svg{width:100%;display:block;overflow:visible}
-  .plan .edge{stroke:rgba(255,255,255,.12);stroke-width:1.1}
-  .plan .node{fill:var(--bg-deep);stroke:var(--faint);stroke-width:1.3;cursor:pointer;transition:.3s}
-  .plan .node:hover{stroke:var(--ink)}
-  .plan .node.cur{fill:var(--cur);stroke:var(--cur);filter:drop-shadow(0 0 5px var(--cur))}
-  .plan .ring{fill:none;stroke:var(--cur);opacity:0;transition:.4s}
-  .plan .ring.cur{opacity:.45}
-  .plan .nlabel{font-family:var(--mono);font-size:5.2px;letter-spacing:.04em;fill:var(--faint);text-transform:uppercase;pointer-events:none;transition:.3s}
-  .plan .nlabel.cur{fill:var(--cur)}
-
-  .coord{position:fixed; right:28px; bottom:30px; text-align:right; font-family:var(--mono)}
-  .coord .now{font-size:13px;letter-spacing:.06em;color:var(--cur,var(--ink));text-shadow:0 0 18px var(--cur)}
-  .coord .tag{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--faint);margin-top:4px}
-
-  .hint{
-    position:fixed; left:50%; bottom:108px; transform:translateX(-50%);
-    font-family:var(--mono); font-size:10.5px; letter-spacing:.16em; text-transform:uppercase;
-    color:var(--faint); text-align:center; line-height:1.9;
-    transition:opacity .8s; pointer-events:none;
-  }
-  .hint b{color:var(--muted);font-weight:400}
-  .hint.hide{opacity:0}
-
-  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
-
-  @media (max-width:760px){
-    :root{--rw:300px;--rh:430px}
-    .brand{left:18px;top:16px}
-    .jump{display:none}
-    .plan{left:14px;bottom:104px;width:104px}
-    .coord{right:16px;bottom:96px}
-    .pad{bottom:22px}
-    .hint{bottom:168px}
-  }
-
-  @media (prefers-reduced-motion:reduce){
-    .world{transition:transform .3s ease}
-    .haze,.scene::before{animation:none}
-    .content,.seat{transition:opacity .3s ease}
+  .caption b { color: var(--ink); letter-spacing: 0.2em; }
+  #hint {
+    font-size: 10px; letter-spacing: 0.18em;
+    text-transform: uppercase; color: #b3b3b3;
+    transition: opacity .4s ease; user-select: none;
   }
 </style>
 </head>
 <body>
-
-<div class="scene" id="scene">
-  <div class="world" id="world">
-    <div class="floor"></div>
+  <div class="stage">
+    <canvas id="game" width="600" height="600" aria-label="Elev8 scene"></canvas>
+    <div class="caption"><b>Elev8</b> &nbsp;||&nbsp; OR</div>
+    <div id="hint">press enter &nbsp;·&nbsp; or click the call button</div>
   </div>
-</div>
-
-<div class="vignette"></div>
-
-<div class="hud">
-  <div class="brand"><b id="brandName">Your Name</b><span id="brandTag">spatial portfolio · v0</span></div>
-  <nav class="jump" id="jump" aria-label="Jump to room"></nav>
-
-  <div class="hint" id="hint">
-    <span><b>↑ scroll</b> or <b>arrow keys</b> to move · <b>plan</b> to jump</span>
-  </div>
-
-  <div class="plan" aria-label="Floor plan">
-    <div class="plan-head"><span>Floor plan</span><span id="planDepth">00</span></div>
-    <svg id="planSvg" viewBox="0 0 100 126" role="group"></svg>
-  </div>
-
-  <div class="pad" role="group" aria-label="Move through the space">
-    <button class="d up"    id="dUp"    aria-label="Move forward">↑</button>
-    <button class="d left"  id="dLeft"  aria-label="Look left">←</button>
-    <button class="d down"  id="dDown"  aria-label="Move back">↓</button>
-    <button class="d right" id="dRight" aria-label="Look right">→</button>
-  </div>
-
-  <div class="coord">
-    <div class="now" id="coordNow">Entrance</div>
-    <div class="tag" id="coordTag">Entrance · 00</div>
-  </div>
-
-  <div class="sr" id="live" aria-live="polite"></div>
-</div>
-
-<div class="app-shell" id="appShell" aria-hidden="true">
-  <div class="app-backdrop"></div>
-  <div class="app-screen" role="dialog" aria-modal="true" aria-label="Embedded project">
-    <div class="app-bar">
-      <span class="app-dot"></span>
-      <span class="app-name" id="appName">Project</span>
-      <span class="app-live">live</span>
-      <a class="app-ext" id="appExt" target="_blank" rel="noopener" aria-label="Open in a new tab">open &#8599;</a>
-      <button class="app-off" id="appOff" aria-label="Power off and return to the room">power off</button>
-    </div>
-    <div class="app-frame">
-      <iframe id="appFrame" title="Embedded project" referrerpolicy="no-referrer"></iframe>
-      <div class="app-scan"></div>
-    </div>
-  </div>
-</div>
 
 <script>
-/* ============================================================
-   ROOM MAP — the whole structure of the house lives here.
-   Add a room: add an object + wire its links.
-   x/y/z = position in space.  ry = yaw (side rooms angle in).
-   plan  = position on the 2D floor-plan minimap.
-   links = where forward / back / left / right lead.
-   ============================================================ */
-const SPACING = 1300, SIDE = 1300;
+(() => {
+  const cv  = document.getElementById('game');
+  const ctx = cv.getContext('2d');
+  const hint = document.getElementById('hint');
+  const W = 600, H = 600;
+  const R = Math.round;
 
-/* ---- YOU: edit these in one place; they flow everywhere ---- */
-const SITE = {
-  name:      "Your Name",
-  role:      "Designer · Developer · Maker",
-  statement: "A space to walk through, not scroll. Move straight ahead to go deeper; step left or right to look into a room.",
-  tagline:   "spatial portfolio · v0",   // the small line under your name, top-left
-};
+  // ---- Layout ----------------------------------------------------------
+  const ROOM   = { x: 70, y: 70, w: 460, h: 460 };
+  const GROUND = 500;
 
-/* ---- Projects shown in the Projects-room carousel (placeholders for now) ---- */
-const PROJECTS = [
-  { title:"Color Selector", url:"https://mich-scott.github.io/color-selector/" },
-  { title:"Project 2" },
-  { title:"Project 3" },
-  { title:"Project 4" },
-  { title:"Project 5" },
-  { title:"Project 6" },
-];
+  const ELE = { w: 132, h: 200 };
+  ELE.x  = R(ROOM.x + ROOM.w / 2 - ELE.w / 2);
+  ELE.y  = GROUND - ELE.h;
+  ELE.cx = ELE.x + ELE.w / 2;
 
-/* ---- Games shown in the Games-room carousel ---- */
-const GAMES = [
-  { title:"Elev8or", url:"https://mich-scott.github.io/games/elev8or" },
-  { title:"Game 2" },
-  { title:"Game 3" },
-];
+  const BTN = { x: ELE.x + ELE.w + 14, y: ELE.y + ELE.h - 64, w: 16, h: 30 };
+  BTN.cx = BTN.x + 8; BTN.cy = BTN.y + 15; BTN.hit = 18;
 
-const ROOMS = [
-  { id:"door", title:SITE.name, accent:"--a-door", door:true,
-    role:SITE.role,
-    stmt:SITE.statement,
-    x:0, y:0, z:0, ry:0, plan:{x:50,y:114}, label:"Front door",
-    tag:"Entrance · 00", now:"Entrance", links:{ forward:"resume" } },
+  // ---- State -----------------------------------------------------------
+  const U = 6, SPEED = 78;
+  const char = {
+    x: ROOM.x + ROOM.w + 20, feetY: GROUND, scale: 1, alpha: 1,
+    phase: 0, facing: 'left', state: 'walking',
+    blink: 0, blinkTimer: 1.5 + Math.random() * 2
+  };
 
-  { id:"resume", title:"Résumé", accent:"--a-resume",
-    blurb:"Roles, tools, and the through-line of the work so far.",
-    x:0, y:0, z:-SPACING, ry:0, plan:{x:50,y:88}, label:"Résumé",
-    tag:"Main hall · 01", now:"Résumé", links:{ back:"door", forward:"projects" } },
+  let scene = 1, s1Alpha = 1, s2Alpha = 0;
+  let stateTimer = 0, clock = 0, buttonLit = false;
 
-  { id:"projects", title:"Projects", accent:"--a-projects",
-    blurb:"Things built, shipped, and taken apart to see how they work.",
-    carousel:PROJECTS,
-    x:0, y:0, z:-SPACING*2, ry:0, plan:{x:50,y:62}, label:"Projects",
-    tag:"Main hall · 02", now:"Projects", links:{ back:"resume", left:"art", right:"music", forward:"games" } },
+  let floor = 0, pendingDir = 0;
+  let bubbleText = '', bubbleAlpha = 0, bubblePop = 0;
+  let shakeTime = 0;
+  let lightCurrent = 0;             // smoothed lighting: -1 pitch black .. 0 lobby .. +1 white-out
 
-  { id:"art", title:"Art & Design", accent:"--a-art",
-    blurb:"Visual work — type, image, color, and composition.",
-    x:-SIDE, y:0, z:-SPACING*2, ry:40, plan:{x:20,y:62}, label:"Art",
-    tag:"West wing · 02", now:"Art & Design", links:{ right:"projects" } },
+  const ANNOUNCE_DUR = 0.5, SETTLE_DUR = 0.25, SHAKE_DUR = 1.0, SHAKE_AMP = 5;
 
-  { id:"music", title:"Music", accent:"--a-music",
-    blurb:"Tracks, mixes, and experiments in sound.",
-    x:SIDE, y:0, z:-SPACING*2, ry:-40, plan:{x:80,y:62}, label:"Music",
-    tag:"East wing · 02", now:"Music", links:{ left:"projects" } },
+  // colours recomputed each frame from lightCurrent
+  let BG = '#fff', INK = '#111', EYE = '#fff', TXT = '#111', TXTFADE = 1;
+  const GOLD = [255, 255, 210];     // warmest peak of the ascent (pale, sunlit)
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const rgb  = (r, g, b) => `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
+  const smoothstep = (e0, e1, x) => { const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
 
-  { id:"games", title:"Games", accent:"--a-games",
-    blurb:"Playable prototypes and small interactive worlds.",
-    carousel:GAMES,
-    x:0, y:0, z:-SPACING*3, ry:0, plan:{x:50,y:30}, label:"Games",
-    tag:"Back room · 03", now:"Games", links:{ back:"projects" } },
-];
+  // scene-1 painted background (designer art). bump ?v= when you re-export.
+  const scene1Img = new Image();
+  let bgReady = false;
+  scene1Img.onload = () => { bgReady = true; };
+  scene1Img.src = 'assets/scene1.png?v=1';
 
-const byId = Object.fromEntries(ROOMS.map(r => [r.id, r]));
-const PLAN_EDGES = [["door","resume"],["resume","projects"],["projects","games"],["projects","art"],["projects","music"]];
+  const floorLabel = f => f > 0 ? String(f) : f < 0 ? 'B' + (-f) : null;
 
-const world  = document.getElementById("world");
-const scene  = document.getElementById("scene");
-const reduce = matchMedia("(prefers-reduced-motion:reduce)").matches;
-
-let current = "door", moving = false;
-
-/* build rooms */
-ROOMS.forEach((r,i)=>{
-  const el = document.createElement("article");
-  el.className = "room";
-  el.id = "room-" + r.id;
-  el.style.setProperty("--rc", `var(${r.accent})`);
-  el.style.setProperty("--bd", (8 + (i % 4) * 1.3) + "s");
-  el.style.setProperty("--delay", (-(i * 1.7)) + "s");
-  el.style.transform = `translate3d(${r.x}px, ${r.y}px, ${r.z}px) rotateY(${r.ry}deg)`;
-
-  let inner;
-  if(r.door){
-    inner = `<div class="eyebrow door-role">${r.role}</div>
-       <h1 class="title door-name">${r.title}</h1>
-       <p class="blurb door-stmt">${r.stmt}</p>`;
-  } else if(r.carousel){
-    const items = r.carousel;
-    inner = `<div class="eyebrow">${r.label}</div>
-       <h2 class="title proj-title" id="title-${r.id}" role="button" tabindex="0" aria-expanded="false" aria-controls="carousel-${r.id}">${r.title}</h2>
-       <p class="blurb proj-blurb">${r.blurb}</p>
-       <div class="proj-hint">&#9656; click to open</div>
-       <div class="carousel" id="carousel-${r.id}">
-         <div class="stage" id="stage-${r.id}">
-           ${items.map((p,i)=>`
-             <button class="pcard" data-i="${i}"${p.url ? ' data-live="1"' : ''} aria-label="${p.title}${p.url ? ' — live app" ' : '" '}>
-               <span class="thumb"><span class="pnum">${String(i+1).padStart(2,"0")}</span></span>
-               <span class="pname">${p.title}</span>
-               ${p.url ? '<span class="plaunch">&#9656; launch</span>' : ''}
-             </button>`).join("")}
-         </div>
-         <div class="projector"></div>
-         <div class="carnav">
-           <button class="carbtn" id="prev-${r.id}" aria-label="Previous">&lsaquo;</button>
-           <span class="carcount" id="count-${r.id}">01 / ${items.length}</span>
-           <button class="carbtn" id="next-${r.id}" aria-label="Next">&rsaquo;</button>
-         </div>
-       </div>`;
-  } else {
-    inner = `<div class="eyebrow">${r.label}</div>
-       <h2 class="title">${r.title}</h2>
-       <p class="blurb">${r.blurb}</p>
-       <div class="tagline">in progress</div>`;
+  // signed lighting target as a linear floor fraction; shaped per-side below
+  function lightTarget() {
+    if (scene !== 2 || floor === 0) return 0;
+    return Math.max(-1, Math.min(1, floor / 20));
   }
 
-  el.innerHTML = `<div class="haze"></div><div class="seat"></div><div class="content">${inner}</div>`;
-  el.addEventListener("click", ()=>{ if(r.id !== current) focus(r.id); });
-  world.appendChild(el);
-});
+  // ---- Audio (Route 1: piano one-shots, game-side step sequencer) ------
+  let audioCtx = null, masterGain = null, audioReady = false;
+  const buffers = {};                 // pitch name -> decoded AudioBuffer
 
-/* ---------- carousels (coverflow) — one per room that declares `carousel` ---------- */
-const CAROUSELS = {};   // roomId -> { goTo, active, close }
+  const AV = 'v=1';                   // bump when you re-export a note (matches your ?v= convention)
+  // Only the notes you've bounced are listed. Add a line as you export each new pitch.
+  // Filenames are case-sensitive on GitHub Pages — these match your capitalised B2/Bb2.
+  const NOTE_FILES = {
+    'Bb': 'assets/piano/Bb2.wav',     // descent pitch — slot 2 flips to this going down
+    'B':  'assets/piano/B2.wav',      // floor 0 resting pitch (natural 3rd over G)
+    // 'G':  'assets/piano/G2.wav',
+    // 'D':  'assets/piano/D3.wav',
+    // 'Eb': 'assets/piano/Eb3.wav',
+    // 'A':  'assets/piano/A2.wav',
+    // 'C':  'assets/piano/C3.wav',
+  };
 
-function initCarousel(roomId){
-  const stage = document.getElementById("stage-"+roomId);
-  if(!stage) return;
-  const items = byId[roomId].carousel;
-  const cards = [...stage.querySelectorAll(".pcard")];
-  const prev  = document.getElementById("prev-"+roomId);
-  const next  = document.getElementById("next-"+roomId);
-  const count = document.getElementById("count-"+roomId);
-  const N = cards.length;
-  let active = 0;
+  // --- the 8-slot sequence, as data. index 1 is the pulse slot. -----------
+  const REST = null;
+  const PATTERN_0 = [REST,'B', REST,REST,REST,REST,REST,REST];  // floor 0: B natural pulsing on slot 2
+  const PATTERN_A = ['G','Bb','D','Eb','A','Bb','C','D'];        // descent target, variant A
+  const PATTERN_B = ['G','Bb','D','Eb','A','Bb','D','Eb'];       // descent target, variant B (unused yet)
+  // floor (negative) at which each slot first sounds during descent — tune by ear.
+  // notes with no file yet stay silent regardless, so you can tune this before bouncing them.
+  const REVEAL    = [ -4, -1, -6, -8, -10, -12, -14, -16 ];
 
-  function layout(){
-    cards.forEach((c,i)=>{
-      const d = i - active, ad = Math.abs(d), s = Math.sign(d);
-      const x  = d===0 ? 0 : s * (118 + (ad-1) * 46);
-      const ry = d===0 ? 0 : -s * 48;
-      const z  = -ad * 70;
-      c.style.transform = `translateX(${x}px) translateZ(${z}px) rotateY(${ry}deg)`;
-      c.style.opacity = ad > 3 ? 0 : Math.max(.16, 1 - ad * .3);
-      c.style.zIndex = 100 - ad;
-      c.style.pointerEvents = ad > 3 ? "none" : "auto";
-      c.classList.toggle("is-front", d===0);
-      c.setAttribute("aria-current", d===0 ? "true" : "false");
+  function activeNote(step, fl) {     // which pitch (or REST) sounds on this slot right now
+    if (fl >= 0) return fl === 0 ? PATTERN_0[step] : REST;   // 0 = B pulse; ascent = TBD (heaven)
+    const pat = PATTERN_A;            // TODO: branch to PATTERN_B when the A/B chooser is designed
+    return fl <= REVEAL[step] ? pat[step] : REST;
+  }
+
+  // --- clock: 8th notes at 130 BPM, lookahead scheduler (drift-free) -------
+  const BPM = 130;
+  const STEP = (60 / BPM) / 2;        // eighth-note duration in seconds (~0.2308s)
+  const LOOKAHEAD = 0.10, TICK = 25;  // peek 100ms ahead, wake every 25ms
+  let seqStep = 0, nextStepTime = 0, seqTimer = null;
+
+  function unlockAudio() {            // MUST be called from inside a user gesture
+    if (audioCtx) { if (audioCtx.state === 'suspended') audioCtx.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    audioCtx = new AC();
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = 0.7;     // headroom for overlapping tails / future layers
+    masterGain.connect(audioCtx.destination);
+    audioReady = true;
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    loadNotes();                     // decode whatever's uploaded; missing files stay silent
+  }
+
+  async function loadNotes() {
+    for (const [name, url] of Object.entries(NOTE_FILES)) {
+      try {
+        const res = await fetch(url + '?' + AV);
+        const arr = await res.arrayBuffer();
+        buffers[name] = await audioCtx.decodeAudioData(arr);
+      } catch (e) { /* not uploaded yet — that slot simply stays silent until it is */ }
+    }
+  }
+
+  function playHit(name, when) {
+    const buf = buffers[name];
+    if (!buf) return;                // no file for this pitch yet -> rest
+    const src = audioCtx.createBufferSource();
+    src.buffer = buf;
+    src.connect(masterGain);
+    src.start(when);
+  }
+
+  function seqTick() {               // book any steps that fall inside the lookahead window
+    if (!audioReady) return;
+    while (nextStepTime < audioCtx.currentTime + LOOKAHEAD) {
+      const name = activeNote(seqStep, floor);   // read floor live -> pattern mutates as you travel
+      if (name) playHit(name, nextStepTime);
+      nextStepTime += STEP;
+      seqStep = (seqStep + 1) % 8;
+    }
+  }
+
+  function startSequencer() {        // kicks in as floor 0 establishes
+    if (!audioReady || seqTimer) return;
+    seqStep = 0;
+    nextStepTime = audioCtx.currentTime + 0.06;   // tiny cushion before first hit
+    seqTimer = setInterval(seqTick, TICK);
+  }
+
+  // ---- Input -----------------------------------------------------------
+  function callElevator() {
+    if (scene !== 1 || char.state !== 'idle') return;
+    unlockAudio();                  // the gesture that satisfies browser autoplay policy
+    char.state = 'turning'; char.facing = 'away';
+    stateTimer = 0; buttonLit = true; hint.style.opacity = 0;
+  }
+  function travel(dir) {
+    if (scene !== 2 || char.state !== 'asking') return;
+    pendingDir = dir;
+    bubbleText = dir > 0 ? 'Going up.' : 'Going down.';
+    bubblePop = 0.18;
+    char.state = 'announce'; stateTimer = 0;
+  }
+  function canvasPoint(e) {
+    const r = cv.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * (W / r.width),
+             y: (e.clientY - r.top)  * (H / r.height) };
+  }
+  const overButton = p => Math.hypot(p.x - BTN.cx, p.y - BTN.cy) <= BTN.hit;
+
+  cv.addEventListener('click', e => { if (overButton(canvasPoint(e))) callElevator(); });
+  cv.addEventListener('mousemove', e => {
+    const active = scene === 1 && char.state === 'idle' && overButton(canvasPoint(e));
+    cv.style.cursor = active ? 'pointer' : 'default';
+  });
+  window.addEventListener('keydown', e => {
+    if (e.key === 'Enter')          { e.preventDefault(); callElevator(); }
+    else if (e.key === 'ArrowUp')   { e.preventDefault(); travel(1); }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); travel(-1); }
+  });
+
+  // ---- Update ----------------------------------------------------------
+  function update(dt) {
+    clock += dt;
+
+    switch (char.state) {
+      case 'walking':
+        char.facing = 'left'; char.x -= SPEED * dt; char.phase += dt * 9;
+        if (char.x <= ELE.cx) { char.x = ELE.cx; char.facing = 'front'; char.state = 'idle'; char.phase = 0; }
+        break;
+
+      case 'idle': char.facing = 'front'; break;
+
+      case 'turning':
+        char.facing = 'away'; stateTimer += dt;
+        if (stateTimer >= 0.5) { char.state = 'boarding'; char.phase = 0; stateTimer = 0; }
+        break;
+
+      case 'boarding': {
+        char.facing = 'away'; stateTimer += dt; char.phase += dt * 7;
+        const p = Math.min(1, stateTimer / 1.2);
+        char.feetY = GROUND - p * 70;
+        char.scale = 1 - p * 0.42;
+        char.alpha = p < 0.55 ? 1 : Math.max(0, 1 - (p - 0.55) / 0.45);
+        if (p > 0.7) s1Alpha = Math.max(0, 1 - (p - 0.7) / 0.3);
+        if (p >= 1) { char.state = 'clearing'; char.alpha = 0; stateTimer = 0; }
+        break;
+      }
+
+      case 'clearing':
+        s1Alpha = Math.max(0, s1Alpha - dt / 0.4); stateTimer += dt;
+        if (stateTimer >= 0.5) {
+          scene = 2; s2Alpha = 0; floor = 0; lightCurrent = 0;
+          char.feetY = GROUND; char.scale = 1; char.alpha = 1;
+          char.x = ROOM.x - 30; char.facing = 'right';
+          char.phase = 0; char.state = 'walking2'; stateTimer = 0;
+          startSequencer();         // the B-natural pulse opens as floor 0 establishes
+        }
+        break;
+
+      case 'walking2': {
+        s2Alpha = Math.min(1, s2Alpha + dt / 0.4);
+        char.facing = 'right'; char.x += SPEED * dt; char.phase += dt * 9;
+        const tgt = ROOM.x + ROOM.w / 2;
+        if (char.x >= tgt) {
+          char.x = tgt; char.facing = 'front'; char.state = 'asking'; char.phase = 0;
+          bubbleText = 'Elevator going up?'; bubblePop = 0.18;
+          hint.textContent = '\u2191 up  \u00b7  \u2193 down'; hint.style.opacity = '1';
+        }
+        break;
+      }
+
+      case 'asking': char.facing = 'front'; break;
+
+      case 'announce':
+        char.facing = 'front'; stateTimer += dt;
+        if (stateTimer >= ANNOUNCE_DUR) { char.state = 'settle'; stateTimer = 0; }
+        break;
+
+      case 'settle':
+        char.facing = 'front'; stateTimer += dt;
+        if (stateTimer >= SETTLE_DUR) {
+          floor += pendingDir;
+          shakeTime = SHAKE_DUR;
+          char.state = 'jolting';
+        }
+        break;
+
+      case 'jolting':
+        char.facing = 'front';
+        shakeTime = Math.max(0, shakeTime - dt);
+        if (shakeTime <= 0) { char.state = 'asking'; bubbleText = 'Elevator going up?'; bubblePop = 0.18; }
+        break;
+    }
+
+    // smoothly ease the lighting toward the current floor's darkness
+    lightCurrent += (lightTarget() - lightCurrent) * Math.min(1, dt * 6);
+
+    const showBubble = scene === 2 && (char.state === 'asking' || char.state === 'announce');
+    bubbleAlpha = showBubble
+      ? Math.min(1, bubbleAlpha + dt / 0.3)
+      : Math.max(0, bubbleAlpha - dt / 0.3);
+    bubblePop = Math.max(0, bubblePop - dt);
+
+    char.blinkTimer -= dt;
+    if (char.blinkTimer <= 0) { char.blink = 0.12; char.blinkTimer = 2.2 + Math.random() * 2.8; }
+    if (char.blink > 0) char.blink -= dt;
+  }
+
+  // ---- Draw helpers ----------------------------------------------------
+  function px(x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(R(x), R(y), R(w), R(h)); }
+
+  function roundRectPath(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function drawBorder() {
+    ctx.strokeStyle = INK; ctx.lineWidth = 1.5;
+    ctx.strokeRect(ROOM.x + 0.5, ROOM.y + 0.5, ROOM.w, ROOM.h);
+  }
+  function drawFloor() {
+    ctx.strokeStyle = INK; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(ROOM.x, GROUND + 0.5); ctx.lineTo(ROOM.x + ROOM.w, GROUND + 0.5); ctx.stroke();
+  }
+
+  function drawElevator() {   // scene 1 only, always lit
+    ctx.strokeStyle = '#111'; ctx.lineWidth = 2;
+    ctx.strokeRect(ELE.x + 0.5, ELE.y + 0.5, ELE.w, ELE.h);
+    const dw = 18;
+    [ELE.x, ELE.x + ELE.w - dw].forEach(dx => {
+      ctx.strokeRect(dx + 0.5, ELE.y + 0.5, dw, ELE.h);
+      ctx.beginPath();
+      ctx.moveTo(dx + dw / 2 + 0.5, ELE.y + 6);
+      ctx.lineTo(dx + dw / 2 + 0.5, ELE.y + ELE.h - 6);
+      ctx.stroke();
     });
-    count.textContent = String(active+1).padStart(2,"0") + " / " + N;
-    prev.disabled = active === 0;
-    next.disabled = active === N-1;
-  }
-  function goTo(i){ active = Math.max(0, Math.min(N-1, i)); layout(); }
+    ctx.lineWidth = 1;
+    ctx.strokeRect(ELE.x + dw + 8.5, ELE.y + 12.5, ELE.w - 2 * (dw + 8), ELE.h - 18);
+    px(ELE.cx - 10, ELE.y + 18, 20, 5, '#111');
 
-  cards.forEach((c,i)=> c.addEventListener("click", e=>{
-    e.stopPropagation();
-    if(i !== active){ goTo(i); return; }
-    const p = items[i];
-    if(p && p.url) openApp(p);
-  }));
-  prev.addEventListener("click", e=>{ e.stopPropagation(); goTo(active-1); });
-  next.addEventListener("click", e=>{ e.stopPropagation(); goTo(active+1); });
+    const dispW = 46, dispH = 26, dx = R(ELE.cx - dispW / 2), dy = ELE.y - dispH - 10;
+    px(dx, dy, dispW, dispH, '#111');
+    ctx.fillStyle = '#fff'; ctx.font = '700 20px ui-monospace, Menlo, Consolas, monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('8', dx + dispW / 2, dy + dispH / 2 + 1);
 
-  layout();
-
-  // title-gated reveal
-  const room  = document.getElementById("room-"+roomId);
-  const title = document.getElementById("title-"+roomId);
-  function setOpen(open){
-    room.classList.toggle("proj-open", open);
-    title.setAttribute("aria-expanded", open ? "true" : "false");
-  }
-  function toggle(){ setOpen(!room.classList.contains("proj-open")); }
-  title.addEventListener("click", e=>{
-    if(current !== roomId) return;            // not arrived yet → let it bubble and navigate
-    e.stopPropagation(); toggle();
-  });
-  title.addEventListener("keydown", e=>{
-    if((e.key==="Enter" || e.key===" ") && current===roomId){ e.preventDefault(); e.stopPropagation(); toggle(); }
-  });
-
-  CAROUSELS[roomId] = { goTo, get active(){ return active; }, close:()=>setOpen(false) };
-}
-ROOMS.filter(r=>r.carousel).forEach(r=> initCarousel(r.id));
-
-/* ---------- embedded app shell (live project, AR-style) ---------- */
-const appShell = document.getElementById("appShell");
-const appFrame = document.getElementById("appFrame");
-const appName  = document.getElementById("appName");
-const appOff   = document.getElementById("appOff");
-const appExt   = document.getElementById("appExt");
-let appOpen = false;
-
-function openApp(p){
-  appShell.style.setProperty("--app-accent", "var(" + byId[current].accent + ")");
-  appName.textContent = p.title;
-  appExt.href = p.url;
-  appFrame.src = p.url;                     // lazy: only loads now
-  appShell.classList.add("is-open");
-  appShell.setAttribute("aria-hidden","false");
-  appOpen = true;
-  appOff.focus();
-}
-function closeApp(){
-  if(!appOpen) return;
-  appShell.classList.remove("is-open");
-  appShell.setAttribute("aria-hidden","true");
-  appFrame.src = "about:blank";             // unload to free memory
-  appOpen = false;
-}
-appOff.addEventListener("click", closeApp);
-appShell.querySelector(".app-backdrop").addEventListener("click", closeApp);
-
-/* build floor-plan minimap */
-const svg = document.getElementById("planSvg");
-let svgHTML = "";
-PLAN_EDGES.forEach(([a,b])=>{
-  const p=byId[a].plan, q=byId[b].plan;
-  svgHTML += `<line class="edge" x1="${p.x}" y1="${p.y}" x2="${q.x}" y2="${q.y}"/>`;
-});
-ROOMS.forEach(r=>{
-  const dx = r.plan.x < 30 ? -3 : r.plan.x > 70 ? 3 : 0;
-  const anchor = r.plan.x < 30 ? "end" : r.plan.x > 70 ? "start" : "middle";
-  const ly = r.plan.y < 35 ? r.plan.y-7 : r.plan.y+9;
-  svgHTML += `
-    <circle class="ring" id="ring-${r.id}" cx="${r.plan.x}" cy="${r.plan.y}" r="7"/>
-    <circle class="node" id="node-${r.id}" cx="${r.plan.x}" cy="${r.plan.y}" r="4.2"
-            tabindex="0" role="button" aria-label="Go to ${r.now}"></circle>
-    <text class="nlabel" id="nl-${r.id}" x="${r.plan.x+dx}" y="${ly}" text-anchor="${anchor}">${r.label}</text>`;
-});
-svg.innerHTML = svgHTML;
-ROOMS.forEach(r=>{
-  const n = document.getElementById("node-"+r.id);
-  n.addEventListener("click", ()=>focus(r.id));
-  n.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){e.preventDefault();focus(r.id);} });
-});
-
-/* build quick-jump */
-const jump = document.getElementById("jump");
-ROOMS.filter(r=>!r.door).forEach(r=>{
-  const b = document.createElement("button");
-  b.id = "jump-"+r.id;
-  b.innerHTML = `${r.now}<span class="dot"></span>`;
-  b.addEventListener("click", ()=>focus(r.id));
-  jump.appendChild(b);
-});
-
-/* camera */
-const cameraFor = r => `rotateY(${-r.ry}deg) translate3d(${-r.x}px, ${-r.y}px, ${-r.z}px)`;
-
-function focus(id, instant){
-  if(!byId[id] || (id===current && !instant) || (moving && !instant)) return;
-  const r = byId[id];
-  if(instant){
-    const t = world.style.transition;
-    world.style.transition = "none";
-    world.style.transform = cameraFor(r);
-    void world.offsetWidth;
-    world.style.transition = t;
-  }else{
-    moving = true;
-    world.style.transform = cameraFor(r);
-  }
-  current = id;
-  Object.keys(CAROUSELS).forEach(rid=>{ if(rid !== id) CAROUSELS[rid].close(); });
-  updateHUD();
-  document.getElementById("hint").classList.add("hide");
-}
-if(!reduce) world.addEventListener("transitionend", e=>{ if(e.propertyName==="transform") moving=false; });
-
-/* HUD sync */
-const pad = { up:document.getElementById("dUp"), down:document.getElementById("dDown"),
-              left:document.getElementById("dLeft"), right:document.getElementById("dRight") };
-
-function updateHUD(){
-  const r = byId[current];
-  document.documentElement.style.setProperty("--cur", `var(${r.accent})`);
-
-  const map = { up:"forward", down:"back", left:"left", right:"right" };
-  for(const k in pad){
-    const dest = r.links[map[k]];
-    pad[k].disabled = !dest;
-    if(dest) pad[k].setAttribute("data-label", (k==="up"&&r.door?"Enter · ":"") + byId[dest].now);
-    else pad[k].removeAttribute("data-label");
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(BTN.x + 0.5, BTN.y + 0.5, BTN.w, BTN.h);
+    ctx.beginPath(); ctx.arc(BTN.cx, BTN.cy, 4, 0, Math.PI * 2);
+    if (buttonLit) { ctx.fillStyle = '#111'; ctx.fill(); } else { ctx.stroke(); }
   }
 
-  document.getElementById("coordNow").textContent = r.now;
-  document.getElementById("coordTag").textContent = r.tag;
-  document.getElementById("planDepth").textContent = r.tag.split("· ")[1] || "";
-
-  ROOMS.forEach(x=>{
-    document.getElementById("node-"+x.id).classList.toggle("cur", x.id===current);
-    document.getElementById("ring-"+x.id).classList.toggle("cur", x.id===current);
-    document.getElementById("nl-"+x.id).classList.toggle("cur", x.id===current);
-    const jb = document.getElementById("jump-"+x.id);
-    if(jb) jb.classList.toggle("active", x.id===current);
-    document.getElementById("room-"+x.id).classList.toggle("is-active", x.id===current);
-  });
-
-  document.getElementById("live").textContent = `Now in: ${r.now}. ${r.tag}.`;
-}
-
-/* navigation */
-function go(dir){ const link = byId[current].links[dir]; if(link) focus(link); }
-pad.up.addEventListener("click",   ()=>go("forward"));
-pad.down.addEventListener("click", ()=>go("back"));
-pad.left.addEventListener("click", ()=>go("left"));
-pad.right.addEventListener("click",()=>go("right"));
-
-window.addEventListener("keydown", e=>{
-  const k = e.key.toLowerCase();
-
-  if(appOpen){ if(k==="escape") closeApp(); return; }
-
-  if(k==="escape" && CAROUSELS[current]){ CAROUSELS[current].close(); return; }
-
-  // when focus is inside the carousel, left/right flip projects instead of changing rooms
-  const inCar = document.activeElement && document.activeElement.closest
-    ? document.activeElement.closest(".carousel") : null;
-  if(inCar && CAROUSELS[current]){
-    if(k==="arrowleft"||k==="a"){ e.preventDefault(); CAROUSELS[current].goTo(CAROUSELS[current].active-1); return; }
-    if(k==="arrowright"||k==="d"){ e.preventDefault(); CAROUSELS[current].goTo(CAROUSELS[current].active+1); return; }
+  function drawFloorIndicator() {   // dev readout — stays legible at any depth
+    const label = floorLabel(floor);
+    if (label === null) return;
+    const fw = 44, fh = 28, fx = ROOM.x + 16, fy = ROOM.y + 16;
+    px(fx, fy, fw, fh, INK);
+    ctx.fillStyle = EYE; ctx.font = '700 18px ui-monospace, Menlo, Consolas, monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(label, fx + fw / 2, fy + fh / 2 + 1);
   }
 
-  if(["arrowup","w"].includes(k)){ e.preventDefault(); go("forward"); }
-  else if(["arrowdown","s"].includes(k)){ e.preventDefault(); go("back"); }
-  else if(["arrowleft","a"].includes(k)){ e.preventDefault(); go("left"); }
-  else if(["arrowright","d"].includes(k)){ e.preventDefault(); go("right"); }
-  else if(k==="enter" && current==="door"){ go("forward"); }
-});
+  function drawBubble() {
+    if (bubbleAlpha <= 0) return;
+    const bw = 320, bh = 92, bx = ROOM.x + ROOM.w / 2 - bw / 2, by = ROOM.y + 26;
+    const cx = bx + bw / 2, cy = by + bh / 2;
+    const s = 1 - 0.12 * (bubblePop / 0.18);
 
-let wheelLock = false;
-window.addEventListener("wheel", e=>{
-  if(appOpen || wheelLock || moving || Math.abs(e.deltaY) < 12) return;
-  wheelLock = true;
-  go(e.deltaY > 0 ? "forward" : "back");
-  setTimeout(()=>wheelLock=false, 650);
-}, {passive:true});
+    ctx.save();
+    ctx.globalAlpha = bubbleAlpha;
+    ctx.translate(cx, cy); ctx.scale(s, s); ctx.translate(-cx, -cy);
 
-let tx=0, ty=0;
-window.addEventListener("touchstart", e=>{ tx=e.touches[0].clientX; ty=e.touches[0].clientY; }, {passive:true});
-window.addEventListener("touchend", e=>{
-  if(appOpen) return;
-  const dx=e.changedTouches[0].clientX-tx, dy=e.changedTouches[0].clientY-ty;
-  if(Math.max(Math.abs(dx),Math.abs(dy)) < 45) return;
-  if(Math.abs(dy) > Math.abs(dx)) go(dy<0 ? "forward" : "back");
-  else go(dx<0 ? "right" : "left");
-}, {passive:true});
+    roundRectPath(bx, by, bw, bh, 16);
+    ctx.fillStyle = BG; ctx.fill();
+    ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.stroke();
 
-/* mouse-look parallax */
-if(!reduce && matchMedia("(pointer:fine)").matches){
-  let px=50, py=46, tpx=50, tpy=46;
-  window.addEventListener("mousemove", e=>{
-    tpx = 50 + (e.clientX/innerWidth  - .5) * 7;
-    tpy = 46 + (e.clientY/innerHeight - .5) * 5;
-  });
-  (function loop(){
-    px += (tpx-px)*.06; py += (tpy-py)*.06;
-    scene.style.perspectiveOrigin = `${px}% ${py}%`;
-    requestAnimationFrame(loop);
-  })();
-}
+    const tx = ROOM.x + ROOM.w / 2, ty = by + bh;
+    ctx.beginPath();
+    ctx.moveTo(tx - 13, ty - 1); ctx.lineTo(tx + 13, ty - 1); ctx.lineTo(tx, ty + 18); ctx.closePath();
+    ctx.fillStyle = BG; ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(tx - 13, ty - 1); ctx.lineTo(tx, ty + 18); ctx.lineTo(tx + 13, ty - 1); ctx.stroke();
 
-/* identity — single source of truth */
-document.getElementById("brandName").textContent = SITE.name;
-document.getElementById("brandTag").textContent  = SITE.tagline;
-document.title = SITE.name + " — portfolio";
+    // text: adaptive colour, fades past floor 20 either direction, never the eyes
+    ctx.globalAlpha = bubbleAlpha * TXTFADE;
+    ctx.fillStyle = TXT;
+    ctx.font = '500 23px system-ui, -apple-system, "Segoe UI", sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    if ('letterSpacing' in ctx) ctx.letterSpacing = '3px';
+    ctx.fillText(bubbleText, cx + 1.5, cy + 1);
+    if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+    ctx.restore();
+  }
 
-focus("door", true);
+  function drawChar() {
+    if (char.alpha <= 0) return;
+    const moving  = char.state === 'walking' || char.state === 'walking2' || char.state === 'boarding';
+    const resting = !moving;
+    const p = char.phase;
+
+    ctx.save();
+    ctx.globalAlpha = char.alpha;
+    ctx.translate(R(char.x), R(char.feetY));
+    ctx.scale(char.scale, char.scale);
+
+    const bob = resting ? Math.sin(clock * 1.8) * 1.2 : -Math.abs(Math.sin(p)) * 2;
+
+    const legW = 2 * U, legTopY = -4 * U;
+    [{ base: -1.6 * U, ph: p }, { base: 1.6 * U, ph: p + Math.PI }].forEach(L => {
+      const swing = moving ? Math.sin(L.ph) * U : 0;
+      const lift  = moving ? Math.max(0, Math.sin(L.ph)) * 1.5 * U : 0;
+      px(L.base - legW / 2 + swing, legTopY, legW, 4 * U - lift, INK);
+    });
+
+    const bodyW = 6 * U, bodyH = 6 * U, bodyY = -10 * U + bob;
+    px(-bodyW / 2, bodyY, bodyW, bodyH, INK);
+    const headW = 5 * U, headH = 5 * U, headY = bodyY - headH;
+    px(-headW / 2, headY, headW, headH, INK);
+
+    // eyes: pure white, always — never fade
+    if (char.facing !== 'away' && char.blink <= 0) {
+      const look = char.facing === 'left' ? -1.4 * U : char.facing === 'right' ? 1.4 * U : 0;
+      const eyeY = headY + 1.6 * U;
+      ctx.globalAlpha = 1;
+      px(look - 1.4 * U, eyeY, U, U, EYE);
+      px(look + 0.4 * U, eyeY, U, U, EYE);
+    }
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+
+  // ---- Loop ------------------------------------------------------------
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    update(dt);
+
+    // ---- lighting for this frame (descent = dark, ascent = cream then white-out) ----
+    const L   = lightCurrent;             // smoothed signed floor fraction (-1..1)
+    const dk  = Math.max(0, -L);
+    const bri = Math.max(0,  L);
+    const DARKINK = 13, PEAK = 0.4;       // ascent peak (cream) lands at floor 8 = 8/20
+
+    if (dk > 0) {
+      const dkE = Math.pow(dk, 0.6);      // eased descent (unchanged look)
+      const v   = 255 * (1 - dkE);
+      BG  = rgb(v, v, v);                 // white -> black
+      INK = rgb(v * 0.05, v * 0.05, v * 0.05);
+      EYE = '#fff';                       // white eyes survive the black
+      TXT = dkE > 0.45 ? '#fff' : INK;
+    } else if (bri > 0) {
+      let cr, cg, cb;
+      if (bri <= PEAK) {                  // floors 1->8: white -> cream
+        const t = bri / PEAK;
+        cr = lerp(255, GOLD[0], t); cg = lerp(255, GOLD[1], t); cb = lerp(255, GOLD[2], t);
+      } else {                            // floors 8->20: cream -> white-out
+        const t = (bri - PEAK) / (1 - PEAK);
+        cr = lerp(GOLD[0], 255, t); cg = lerp(GOLD[1], 255, t); cb = lerp(GOLD[2], 255, t);
+      }
+      const blow = smoothstep(0.5, 1.0, bri);       // body blows out, floors ~10..20
+      BG  = rgb(cr, cg, cb);
+      INK = rgb(lerp(DARKINK, cr, blow), lerp(DARKINK, cg, blow), lerp(DARKINK, cb, blow));
+      EYE = bri > 0.78 ? 'rgb(34,30,26)' : '#fff';   // eyes invert to dark in the glare
+      TXT = 'rgb(58,40,18)';                         // deep warm, lit by the light
+    } else {
+      BG = '#fff'; INK = rgb(DARKINK, DARKINK, DARKINK); EYE = '#fff'; TXT = INK;
+    }
+    // text fades past floor 20 either direction; eyes never fade
+    TXTFADE = 1 - Math.min(1, Math.max(0, (Math.abs(floor) - 20) / 8));
+
+    px(0, 0, W, H, BG);
+
+    let sx = 0, sy = 0;
+    if (shakeTime > 0) {
+      const e   = SHAKE_DUR - shakeTime;
+      const amp = SHAKE_AMP * (shakeTime / SHAKE_DUR);
+      sy = Math.sin(e * 19) * amp;
+      sx = Math.sin(e * 31) * amp * 0.3;
+    }
+    ctx.save();
+    ctx.translate(sx, sy);
+
+    if (scene === 1) {
+      ctx.globalAlpha = s1Alpha;
+      if (bgReady) ctx.drawImage(scene1Img, 0, 0, W, H);   // your painted lobby
+      else { drawFloor(); drawElevator(); }                 // fallback if art missing
+      ctx.globalAlpha = 1;
+      drawBorder();                                         // keyline stays for the transition
+      drawChar();                                           // character animates on top
+    } else {
+      drawBorder();
+      ctx.globalAlpha = s2Alpha; drawFloor(); ctx.globalAlpha = 1;
+      drawFloorIndicator();
+      drawChar();
+      drawBubble();
+    }
+    ctx.restore();
+
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
 </script>
 </body>
 </html>
