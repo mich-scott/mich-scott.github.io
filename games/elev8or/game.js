@@ -73,6 +73,8 @@
     'Bb3': 'Bb3.wav',
     'C4':  'C4.wav',
     'D4':  'D4.wav',
+    'Gb3': 'Gb3.wav',                 // ascent only
+    'Ab3': 'Ab3.wav',                 // ascent only
   };
 
   // --- the 8-slot sequence, as data. index 1 is the pulse slot. -----------
@@ -80,6 +82,7 @@
   const PATTERN_0 = [REST,'B2', REST,REST,REST,REST,REST,REST];            // floor 0: B2 pulsing on slot 2
   const PATTERN_A = ['G2','Bb2','D3','Eb3','A3','Bb3','C4','D4'];          // full underworld sequence (ascending line)
   // const PATTERN_B = ['G2','Bb2','D3','Eb3','A3','Bb3','D4','Eb4'];      // alt ending — needs Eb4.wav; parked with the A/B chooser
+  const PATTERN_H = ['Eb3','B2','Eb3','Gb3','Ab3','Bb3','Ab3','Gb3'];      // full heaven sequence (arching line); B2 keeps its pulse slot
 
   // floor at which each slot first sounds during descent — the descent's shape, tune by ear.
   // values are internal (negative) floors; the B-label + note each governs is noted alongside.
@@ -94,10 +97,24 @@
     -15,  // slot 7  D4   → in at B15 (full sequence complete)
   ];
 
+  // floor at which each slot first sounds during ascent — same accretion idea, mirrored.
+  // B2 holds its pulse slot from floor 0, so 0 -> 1 changes nothing; the first NEW note lands at 3.
+  // unlock ORDER is fixed (B2 → Gb3 → Eb3 → Bb3 → Ab3 → Gb3' → Ab3' → Eb3'); the floors are tune-by-ear.
+  const REVEAL_H = [
+    5,    // slot 0  Eb3  → in at 5
+    0,    // slot 1  B2   → carried over from floor 0 (never absent)
+    15,   // slot 2  Eb3  → in at 15 (full sequence complete)
+    3,    // slot 3  Gb3  → in at 3  (first thing you hear going up)
+    13,   // slot 4  Ab3  → in at 13
+    7,    // slot 5  Bb3  → in at 7
+    9,    // slot 6  Ab3  → in at 9
+    11,   // slot 7  Gb3  → in at 11
+  ];
+
   function activeNote(step, fl) {     // which pitch (or REST) sounds on this slot right now
-    if (fl >= 0) return fl === 0 ? PATTERN_0[step] : REST;   // 0 = B2 pulse; ascent = TBD (heaven)
-    const pat = PATTERN_A;
-    return fl <= REVEAL[step] ? pat[step] : REST;
+    if (fl === 0) return PATTERN_0[step];                                  // the B-natural hinge
+    if (fl < 0)   return fl <= REVEAL[step]   ? PATTERN_A[step] : REST;    // underworld accretes downward
+    return              fl >= REVEAL_H[step] ? PATTERN_H[step] : REST;     // heaven accretes upward
   }
 
   // --- clock: 8th notes at 130 BPM, lookahead scheduler (drift-free) -------
