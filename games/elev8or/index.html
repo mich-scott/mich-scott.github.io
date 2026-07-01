@@ -62,8 +62,7 @@
   ELE.y  = GROUND - ELE.h;
   ELE.cx = ELE.x + ELE.w / 2;
 
-  const BTN = { x: ELE.x + ELE.w + 14, y: ELE.y + ELE.h - 64, w: 16, h: 30 };
-  BTN.cx = BTN.x + 8; BTN.cy = BTN.y + 15; BTN.hit = 18;
+  const BTN = { cx: 378, cy: 426, hit: 10 };
 
   // ---- State -----------------------------------------------------------
   const U = 6, SPEED = 78;
@@ -112,8 +111,8 @@
   // Only the notes you've bounced are listed. Add a line as you export each new pitch.
   // Filenames are case-sensitive on GitHub Pages — these match your capitalised B2/Bb2.
   const NOTE_FILES = {
-    'Bb': 'assets/piano/Bb2.wav',     // descent pitch — slot 2 flips to this going down
     'B':  'assets/piano/B2.wav',      // floor 0 resting pitch (natural 3rd over G)
+    'Bb': 'assets/piano/Bb2.wav',     // descent pitch — slot 2 flips to this going down
     // 'G':  'assets/piano/G2.wav',
     // 'D':  'assets/piano/D3.wav',
     // 'Eb': 'assets/piano/Eb3.wav',
@@ -159,9 +158,13 @@
     for (const [name, url] of Object.entries(NOTE_FILES)) {
       try {
         const res = await fetch(url + '?' + AV);
+        if (!res.ok) throw new Error('HTTP ' + res.status);   // 404 = no file at this exact path/case
         const arr = await res.arrayBuffer();
         buffers[name] = await audioCtx.decodeAudioData(arr);
-      } catch (e) { /* not uploaded yet — that slot simply stays silent until it is */ }
+        console.log('[audio] loaded', name, '<-', url);
+      } catch (e) {
+        console.warn('[audio] could NOT load', name, '<-', url, '—', e.message, '(slot stays silent)');
+      }
     }
   }
 
