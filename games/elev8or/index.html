@@ -108,16 +108,17 @@
   const buffers = {};                 // pitch name -> decoded AudioBuffer
 
   const AV = 'v=1';                   // bump when you re-export a note (matches your ?v= convention)
+  const NOTE_DIR = 'assets/piano/';   // folder your bounced one-shots live in — change here only
   // Only the notes you've bounced are listed. Add a line as you export each new pitch.
   // Filenames are case-sensitive on GitHub Pages — these match your capitalised B2/Bb2.
   const NOTE_FILES = {
-    'B':  'assets/piano/B2.wav',      // floor 0 resting pitch (natural 3rd over G)
-    'Bb': 'assets/piano/Bb2.wav',     // descent pitch — slot 2 flips to this going down
-    // 'G':  'assets/piano/G2.wav',
-    // 'D':  'assets/piano/D3.wav',
-    // 'Eb': 'assets/piano/Eb3.wav',
-    // 'A':  'assets/piano/A2.wav',
-    // 'C':  'assets/piano/C3.wav',
+    'B':  'B2.wav',                   // floor 0 resting pitch (natural 3rd over G)
+    'Bb': 'Bb2.wav',                  // descent pitch — slot 2 flips to this going down
+    // 'G':  'G2.wav',
+    // 'D':  'D3.wav',
+    // 'Eb': 'Eb3.wav',
+    // 'A':  'A2.wav',
+    // 'C':  'C3.wav',
   };
 
   // --- the 8-slot sequence, as data. index 1 is the pulse slot. -----------
@@ -155,7 +156,8 @@
   }
 
   async function loadNotes() {
-    for (const [name, url] of Object.entries(NOTE_FILES)) {
+    for (const [name, file] of Object.entries(NOTE_FILES)) {
+      const url = NOTE_DIR + file;
       try {
         const res = await fetch(url + '?' + AV);
         if (!res.ok) throw new Error('HTTP ' + res.status);   // 404 = no file at this exact path/case
