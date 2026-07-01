@@ -1,0 +1,31 @@
+:root { --ink: #111; }
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; height: 100%;
+  background: #ececec;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  color: #555;
+}
+.stage {
+  min-height: 100%;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 12px; padding: 24px;
+}
+canvas {
+  width: min(86vw, 86vh, 620px);
+  height: auto; aspect-ratio: 1 / 1;
+  background: #fff;
+  image-rendering: pixelated;
+  box-shadow: 0 18px 40px rgba(0,0,0,0.10);
+}
+.caption {
+  font-size: 12px; letter-spacing: 0.35em;
+  text-transform: uppercase; color: #999; user-select: none;
+}
+.caption b { color: var(--ink); letter-spacing: 0.2em; }
+#hint {
+  font-size: 10px; letter-spacing: 0.18em;
+  text-transform: uppercase; color: #b3b3b3;
+  transition: opacity .4s ease; user-select: none;
+}
