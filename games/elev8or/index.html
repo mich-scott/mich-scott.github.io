@@ -62,8 +62,9 @@
   ELE.y  = GROUND - ELE.h;
   ELE.cx = ELE.x + ELE.w / 2;
 
-  const BTN = { cx: 378, cy: 426, hit: 10 };
- 
+  const BTN = { x: ELE.x + ELE.w + 14, y: ELE.y + ELE.h - 64, w: 16, h: 30 };
+  BTN.cx = BTN.x + 8; BTN.cy = BTN.y + 15; BTN.hit = 18;
+
   // ---- State -----------------------------------------------------------
   const U = 6, SPEED = 78;
   const char = {
@@ -103,9 +104,97 @@
     return Math.max(-1, Math.min(1, floor / 20));
   }
 
+  // ---- Audio (Route 1: piano one-shots, game-side step sequencer) ------
+  let audioCtx = null, masterGain = null, audioReady = false;
+  const buffers = {};                 // pitch name -> decoded AudioBuffer
+
+  const AV = 'v=1';                   // bump when you re-export a note (matches your ?v= convention)
+  // Only the notes you've bounced are listed. Add a line as you export each new pitch.
+  // Filenames are case-sensitive on GitHub Pages — these match your capitalised B2/Bb2.
+  const NOTE_FILES = {
+    'Bb': 'assets/piano/Bb2.wav',     // descent pitch — slot 2 flips to this going down
+    'B':  'assets/piano/B2.wav',      // floor 0 resting pitch (natural 3rd over G)
+    // 'G':  'assets/piano/G2.wav',
+    // 'D':  'assets/piano/D3.wav',
+    // 'Eb': 'assets/piano/Eb3.wav',
+    // 'A':  'assets/piano/A2.wav',
+    // 'C':  'assets/piano/C3.wav',
+  };
+
+  // --- the 8-slot sequence, as data. index 1 is the pulse slot. -----------
+  const REST = null;
+  const PATTERN_0 = [REST,'B', REST,REST,REST,REST,REST,REST];  // floor 0: B natural pulsing on slot 2
+  const PATTERN_A = ['G','Bb','D','Eb','A','Bb','C','D'];        // descent target, variant A
+  const PATTERN_B = ['G','Bb','D','Eb','A','Bb','D','Eb'];       // descent target, variant B (unused yet)
+  // floor (negative) at which each slot first sounds during descent — tune by ear.
+  // notes with no file yet stay silent regardless, so you can tune this before bouncing them.
+  const REVEAL    = [ -4, -1, -6, -8, -10, -12, -14, -16 ];
+
+  function activeNote(step, fl) {     // which pitch (or REST) sounds on this slot right now
+    if (fl >= 0) return fl === 0 ? PATTERN_0[step] : REST;   // 0 = B pulse; ascent = TBD (heaven)
+    const pat = PATTERN_A;            // TODO: branch to PATTERN_B when the A/B chooser is designed
+    return fl <= REVEAL[step] ? pat[step] : REST;
+  }
+
+  // --- clock: 8th notes at 130 BPM, lookahead scheduler (drift-free) -------
+  const BPM = 130;
+  const STEP = (60 / BPM) / 2;        // eighth-note duration in seconds (~0.2308s)
+  const LOOKAHEAD = 0.10, TICK = 25;  // peek 100ms ahead, wake every 25ms
+  let seqStep = 0, nextStepTime = 0, seqTimer = null;
+
+  function unlockAudio() {            // MUST be called from inside a user gesture
+    if (audioCtx) { if (audioCtx.state === 'suspended') audioCtx.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    audioCtx = new AC();
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = 0.7;     // headroom for overlapping tails / future layers
+    masterGain.connect(audioCtx.destination);
+    audioReady = true;
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    loadNotes();                     // decode whatever's uploaded; missing files stay silent
+  }
+
+  async function loadNotes() {
+    for (const [name, url] of Object.entries(NOTE_FILES)) {
+      try {
+        const res = await fetch(url + '?' + AV);
+        const arr = await res.arrayBuffer();
+        buffers[name] = await audioCtx.decodeAudioData(arr);
+      } catch (e) { /* not uploaded yet — that slot simply stays silent until it is */ }
+    }
+  }
+
+  function playHit(name, when) {
+    const buf = buffers[name];
+    if (!buf) return;                // no file for this pitch yet -> rest
+    const src = audioCtx.createBufferSource();
+    src.buffer = buf;
+    src.connect(masterGain);
+    src.start(when);
+  }
+
+  function seqTick() {               // book any steps that fall inside the lookahead window
+    if (!audioReady) return;
+    while (nextStepTime < audioCtx.currentTime + LOOKAHEAD) {
+      const name = activeNote(seqStep, floor);   // read floor live -> pattern mutates as you travel
+      if (name) playHit(name, nextStepTime);
+      nextStepTime += STEP;
+      seqStep = (seqStep + 1) % 8;
+    }
+  }
+
+  function startSequencer() {        // kicks in as floor 0 establishes
+    if (!audioReady || seqTimer) return;
+    seqStep = 0;
+    nextStepTime = audioCtx.currentTime + 0.06;   // tiny cushion before first hit
+    seqTimer = setInterval(seqTick, TICK);
+  }
+
   // ---- Input -----------------------------------------------------------
   function callElevator() {
     if (scene !== 1 || char.state !== 'idle') return;
+    unlockAudio();                  // the gesture that satisfies browser autoplay policy
     char.state = 'turning'; char.facing = 'away';
     stateTimer = 0; buttonLit = true; hint.style.opacity = 0;
   }
@@ -169,6 +258,7 @@
           char.feetY = GROUND; char.scale = 1; char.alpha = 1;
           char.x = ROOM.x - 30; char.facing = 'right';
           char.phase = 0; char.state = 'walking2'; stateTimer = 0;
+          startSequencer();         // the B-natural pulse opens as floor 0 establishes
         }
         break;
 
