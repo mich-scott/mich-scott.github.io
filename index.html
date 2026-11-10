@@ -568,21 +568,15 @@ const SITE = {
   tagline:   "spatial portfolio · v0",   // the small line under your name, top-left
 };
 
-/* ---- Projects shown in the Projects-room carousel (placeholders for now) ---- */
+/* ---- Projects shown in the Projects-room carousel ----
+   Add one line per project: { title:"Name", url:"https://..." }  (url optional) */
 const PROJECTS = [
   { title:"Color Selector", url:"https://mich-scott.github.io/color-selector/" },
-  { title:"Project 2" },
-  { title:"Project 3" },
-  { title:"Project 4" },
-  { title:"Project 5" },
-  { title:"Project 6" },
 ];
 
 /* ---- Games shown in the Games-room carousel ---- */
 const GAMES = [
   { title:"Elev8or", url:"https://mich-scott.github.io/games/elev8or" },
-  { title:"Game 2" },
-  { title:"Game 3" },
 ];
 
 const ROOMS = [
@@ -662,7 +656,7 @@ ROOMS.forEach((r,i)=>{
          <div class="projector"></div>
          <div class="carnav">
            <button class="carbtn" id="prev-${r.id}" aria-label="Previous">&lsaquo;</button>
-           <span class="carcount" id="count-${r.id}">01 / ${items.length}</span>
+           <span class="carcount" id="count-${r.id}">${items.length ? "01" : "00"} / ${items.length}</span>
            <button class="carbtn" id="next-${r.id}" aria-label="Next">&rsaquo;</button>
          </div>
        </div>`;
@@ -705,11 +699,11 @@ function initCarousel(roomId){
       c.classList.toggle("is-front", d===0);
       c.setAttribute("aria-current", d===0 ? "true" : "false");
     });
-    count.textContent = String(active+1).padStart(2,"0") + " / " + N;
-    prev.disabled = active === 0;
-    next.disabled = active === N-1;
+    count.textContent = N ? String(active+1).padStart(2,"0") + " / " + N : "00 / 0";
+    prev.disabled = active <= 0;
+    next.disabled = active >= N-1;
   }
-  function goTo(i){ active = Math.max(0, Math.min(N-1, i)); layout(); }
+  function goTo(i){ if(!N) return; active = Math.max(0, Math.min(N-1, i)); layout(); }
 
   cards.forEach((c,i)=> c.addEventListener("click", e=>{
     e.stopPropagation();
