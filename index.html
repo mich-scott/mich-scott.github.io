@@ -379,6 +379,76 @@
   }
   @media (prefers-reduced-motion:reduce){ .app-shell.is-open .app-screen{ animation:none; } }
 
+  /* ---------- RÉSUMÉ LOCK (rotating padlock) ---------- */
+  .lock-shell{ position:fixed; inset:0; z-index:55; display:none; --lk:var(--a-resume); --lk-ok:#5fd68a; --lk-bad:#e2524e; }
+  .lock-shell.is-open{ display:block; }
+  .lock-backdrop{ position:absolute; inset:0; background:rgba(4,6,10,.72); backdrop-filter:blur(12px) saturate(.9); cursor:pointer; }
+  .lock-panel{
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    display:flex; flex-direction:column; align-items:center; gap:34px;
+    font-family:var(--mono); color:var(--ink);
+    animation:appboot .5s var(--ease) both;
+  }
+
+  .wheels{ display:flex; justify-content:center; align-items:center; gap:6px; touch-action:none; user-select:none; -webkit-user-select:none; }
+  .wgap{ width:48px; flex:none; }                         /* ≈ half an inch between the two groups */
+  /* each wheel is a hexagonal prism seen edge-on: a flat front face, plus the two neighbouring
+     faces angled 60° away (so they read at half height), separated by hard ridges */
+  .wheel{
+    --f:44px;                                              /* height of one flat face */
+    position:relative; width:46px; height:calc(var(--f)*2); flex:none; overflow:hidden; border-radius:2px; cursor:ns-resize;
+    background:linear-gradient(180deg,
+      #141a24 0, #252e3e calc(var(--f)*.5 - 1px),                                  /* upper face, tilted toward the light */
+      #56637a calc(var(--f)*.5 - 1px), #56637a calc(var(--f)*.5),                  /* lit ridge */
+      #232b3a calc(var(--f)*.5), #1b2230 calc(var(--f)*1.5),                       /* front face */
+      #030406 calc(var(--f)*1.5), #030406 calc(var(--f)*1.5 + 1px),                /* shadowed ridge */
+      #10141d calc(var(--f)*1.5 + 1px), #07090d 100%);                             /* lower face, turned away */
+    box-shadow:inset 7px 0 8px -7px rgba(0,0,0,.9), inset -7px 0 8px -7px rgba(0,0,0,.9), 0 0 0 1px rgba(0,0,0,.6);
+  }
+  .wheel::before{ /* faint sheen across the front face */
+    content:""; position:absolute; left:0; right:0; top:calc(var(--f)*.5 + 1px); height:calc(var(--f)*.35); pointer-events:none;
+    background:linear-gradient(180deg, rgba(255,255,255,.05), transparent);
+  }
+  .wheel .ch{ position:absolute; left:0; right:0; height:var(--f); line-height:var(--f); text-align:center; font-size:26px; font-weight:700; transition:transform .12s ease-out, color .25s, opacity .25s; }
+  .wheel .ch.c{ top:calc(var(--f)*.5); color:#c9ced8; }
+  .wheel .ch.p{ top:calc(var(--f)*-.25); transform:scaleY(.5); }
+  .wheel .ch.n{ top:calc(var(--f)*1.25); transform:scaleY(.5); }
+  .wheel .ch.p, .wheel .ch.n{ color:var(--muted); opacity:.3; filter:blur(1.1px); }
+  .wheel.cur .ch.c{ color:#fff; text-shadow:0 0 14px var(--lk), 0 0 30px color-mix(in srgb,var(--lk) 60%,transparent); }
+  .wheel.cur::after{ content:""; position:absolute; left:12px; right:12px; top:calc(var(--f)*1.5 - 6px); height:2px; background:var(--lk); box-shadow:0 0 8px var(--lk); animation:lkblink 1s steps(1,end) infinite; }
+  .wheel.back .ch.c{ color:color-mix(in srgb,var(--lk) 70%,#fff); }
+  .wheel.tick .ch.c{ transform:scaleY(.82); }               /* a face snapping into place */
+  @keyframes lkblink{ 50%{ opacity:.25; } }
+
+  .lock-ctrls{ display:flex; gap:14px; }
+  .lkbtn{
+    font-family:var(--mono); font-size:11px; letter-spacing:.24em; text-transform:uppercase;
+    background:none; border:0; color:var(--faint); padding:8px 10px; cursor:pointer; transition:.2s var(--ease);
+  }
+  .lkbtn:hover,.lkbtn:focus-visible{ outline:none; color:var(--ink); text-shadow:0 0 12px var(--lk); }
+  .lkbtn svg{ width:22px; height:16px; display:block; }
+  .lkbtn.kp{ display:none; }
+  @media (pointer:coarse){ .lkbtn.kp{ display:inline-block; } }
+  .lkbtn.go{ display:none; color:var(--lk-ok); text-shadow:0 0 12px var(--lk-ok); font-size:13px; }
+  .lock-shell.ok .lkbtn.go{ display:inline-block; }
+  .lock-shell.ok .lkbtn.kp{ display:none; }
+  .lock-input{ position:absolute; left:0; top:0; width:1px; height:1px; opacity:0; border:0; padding:0; font-size:16px; }
+
+  .lock-shell.ok .wheel .ch.c{ color:var(--lk-ok); text-shadow:0 0 14px var(--lk-ok), 0 0 32px color-mix(in srgb,var(--lk-ok) 50%,transparent); }
+  .lock-shell.ok .wheel::after, .lock-shell.dead .wheel::after{ display:none; }
+  .lock-shell.dead .wheels{ pointer-events:none; }
+  .lock-shell.dead .wheel{ opacity:.5; }
+  .lock-shell.dead .wheel .ch.c{ color:var(--lk-bad); text-shadow:0 0 10px var(--lk-bad); }
+
+  @media (max-width:560px){
+    .wheels{ gap:3px; }
+    .wgap{ width:14px; }
+    .wheel{ --f:36px; width:31px; }
+    .wheel .ch{ font-size:20px; }
+    .wheel.cur::after{ left:7px; right:7px; }
+  }
+  @media (prefers-reduced-motion:reduce){ .lock-panel{ animation:none; } }
+
   /* ---------- HUD (ghosted) ---------- */
   .vignette{position:fixed;inset:0;pointer-events:none;z-index:5;
     background:linear-gradient(to bottom, var(--bg-deep) 0%, transparent 18%, transparent 80%, rgba(6,7,10,.9) 100%);}
@@ -550,6 +620,20 @@
   </div>
 </div>
 
+<div class="lock-shell" id="lockShell" aria-hidden="true">
+  <div class="lock-backdrop" id="lockBackdrop"></div>
+  <div class="lock-panel" role="dialog" aria-modal="true" aria-label="Unlock résumé">
+    <div class="wheels" id="wheels" role="group" aria-label="Access code"></div>
+    <div class="lock-ctrls">
+      <button class="lkbtn kp" id="lkKeypad" aria-label="Show keyboard"><svg viewBox="0 0 22 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1" y="1" width="20" height="14" rx="2"/><path d="M5 5h1M9 5h1M13 5h1M17 5h0M5 8.5h1M9 8.5h1M13 8.5h1M17 8.5h0M7 12h8" stroke-linecap="round"/></svg></button>
+      <button class="lkbtn go" id="lkView">view</button>
+      <button class="lkbtn" id="lkClose">close</button>
+    </div>
+    <div class="sr" id="lockLive" aria-live="polite"></div>
+    <input class="lock-input" id="lockInput" type="text" inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" aria-label="Type access code" tabindex="-1">
+  </div>
+</div>
+
 <script>
 /* ============================================================
    ROOM MAP — the whole structure of the house lives here.
@@ -574,6 +658,13 @@ const PROJECTS = [
   { title:"Color Selector", url:"https://mich-scott.github.io/color-selector/" },
 ];
 
+/* ---- Résumé lock ----
+   The résumé is stored only as an encrypted file (resume.enc). The code is never stored anywhere;
+   the right code is simply the only thing that can decrypt the file. To replace the résumé or
+   change the code, run:  python3 tools/encrypt_resume.py your-resume.pdf
+   groups = how the wheels are split visually (4 + 5 = 9 wheels).                                  */
+const RESUME = { file:"resume.enc", groups:[4,5], tries:3, saveAs:"Michael_Valdez_Resume.pdf" };
+
 /* ---- Games shown in the Games-room carousel ---- */
 const GAMES = [
   { title:"Elev8or", url:"https://mich-scott.github.io/games/elev8or" },
@@ -586,7 +677,7 @@ const ROOMS = [
     x:0, y:0, z:0, ry:0, plan:{x:50,y:114}, label:"Front door",
     tag:"Entrance · 00", now:"Entrance", links:{ forward:"resume" } },
 
-  { id:"resume", title:"Résumé", accent:"--a-resume",
+  { id:"resume", title:"Résumé", accent:"--a-resume", lock:true,
     blurb:"Roles, tools, and the through-line of the work so far.",
     x:0, y:0, z:-SPACING, ry:0, plan:{x:50,y:88}, label:"Résumé",
     tag:"Main hall · 01", now:"Résumé", links:{ back:"door", forward:"projects" } },
@@ -638,6 +729,11 @@ ROOMS.forEach((r,i)=>{
     inner = `<div class="eyebrow door-role">${r.role}</div>
        <h1 class="title door-name">${r.title}</h1>
        <p class="blurb door-stmt">${r.stmt}</p>`;
+  } else if(r.lock){
+    inner = `<div class="eyebrow">${r.label}</div>
+       <h2 class="title proj-title" id="title-${r.id}" role="button" tabindex="0" aria-haspopup="dialog">${r.title}</h2>
+       <p class="blurb">${r.blurb}</p>
+       <div class="proj-hint">&#9656; click to unlock</div>`;
   } else if(r.carousel){
     const items = r.carousel;
     inner = `<div class="eyebrow">${r.label}</div>
@@ -744,10 +840,13 @@ const appOff   = document.getElementById("appOff");
 const appExt   = document.getElementById("appExt");
 let appOpen = false;
 
+const appLive  = appShell.querySelector(".app-live");
 function openApp(p){
   appShell.style.setProperty("--app-accent", "var(" + byId[current].accent + ")");
   appName.textContent = p.title;
   appExt.href = p.url;
+  if(p.download){ appExt.setAttribute("download", p.download); appExt.innerHTML = "download &#8595;"; appLive.textContent = "secure"; }
+  else { appExt.removeAttribute("download"); appExt.innerHTML = "open &#8599;"; appLive.textContent = "live"; }
   appFrame.src = p.url;                     // lazy: only loads now
   appShell.classList.add("is-open");
   appShell.setAttribute("aria-hidden","false");
@@ -763,6 +862,195 @@ function closeApp(){
 }
 appOff.addEventListener("click", closeApp);
 appShell.querySelector(".app-backdrop").addEventListener("click", closeApp);
+
+/* ---------- résumé lock (rotating padlock, decrypts in the browser) ----------
+   Works like a real combination lock: turn any wheel (scroll, drag, tap above/below) or just type.
+   Tapping a wheel's middle moves to the next wheel; "<" on a wheel steps back one.
+   The lock quietly tests the combination whenever it changes and simply opens when it's right —
+   wrong combinations do nothing. Only pressing Enter counts as a try: 3 Enters on a wrong code
+   lock it for the rest of the visit.                                                               */
+const LOCK = (()=>{
+  const CH = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ<", BACK = CH.indexOf("<"), M = CH.length;
+  const N  = RESUME.groups.reduce((a,b)=>a+b, 0);
+  const shell  = document.getElementById("lockShell");
+  const wheelsEl = document.getElementById("wheels");
+  const liveEl = document.getElementById("lockLive");
+  const input  = document.getElementById("lockInput");
+  const bKey   = document.getElementById("lkKeypad");
+  const bView  = document.getElementById("lkView");
+  const bClose = document.getElementById("lkClose");
+  const fine   = matchMedia("(pointer:fine)").matches;
+
+  const vals = new Array(N).fill(0);
+  let cur = 0;
+  let tries = RESUME.tries;             // memory only: a fresh visit gets fresh tries
+  let state = "idle";                   // idle | ok | dead
+  let isOpen = false, fileBuf = null, pdfURL = null;
+
+  const wheels = [];
+  RESUME.groups.forEach((g,gi)=>{
+    if(gi) wheelsEl.insertAdjacentHTML("beforeend", '<span class="wgap"></span>');
+    for(let k=0;k<g;k++){
+      const w = document.createElement("div");
+      w.className = "wheel";
+      w.innerHTML = '<span class="ch p"></span><span class="ch c"></span><span class="ch n"></span>';
+      wheelsEl.appendChild(w); wheels.push(w);
+    }
+  });
+
+  function draw(){
+    wheels.forEach((w,i)=>{
+      const v = vals[i], s = w.children;
+      s[0].textContent = CH[(v+M-1)%M]; s[1].textContent = CH[v]; s[2].textContent = CH[(v+1)%M];
+      w.classList.toggle("cur", state==="idle" && i===cur);
+      w.classList.toggle("back", v===BACK);
+    });
+  }
+  function tick(i){ const w=wheels[i]; w.classList.remove("tick"); void w.offsetWidth; w.classList.add("tick"); setTimeout(()=>w.classList.remove("tick"),120); }
+  const idle = ()=> state==="idle";
+  const code = ()=> vals.map(v=>CH[v]).join("");
+
+  /* quiet checking: test the combination once the wheels settle */
+  let settleT = 0, checking = false, again = false;
+  function changed(){ clearTimeout(settleT); settleT = setTimeout(quietCheck, 350); }
+  async function quietCheck(){
+    if(!idle()) return;
+    if(checking){ again = true; return; }
+    const c = code(); if(c.includes("<")) return;
+    checking = true;
+    const pdf = await decrypt(c).catch(()=>null);
+    checking = false;
+    if(pdf) return unlock(pdf);
+    if(again){ again = false; quietCheck(); }
+  }
+
+  function rotate(i,d){ if(!idle()) return; cur=i; vals[i]=(vals[i]+d+M)%M; tick(i); draw(); changed(); }
+  function select(i){ if(!idle()) return; cur=i; draw(); }
+  function back(){ if(!idle()) return; if(vals[cur]===BACK){ vals[cur]=0; changed(); } cur=Math.max(0,cur-1); draw(); }
+  function advance(){ if(!idle()) return; if(vals[cur]===BACK){ back(); return; } tick(cur); cur=Math.min(N-1,cur+1); draw(); }
+  function type(c){
+    if(!idle()) return;
+    const v = CH.indexOf(c.toUpperCase()); if(v<0) return;
+    if(v===BACK){ back(); return; }
+    vals[cur]=v; tick(cur); cur=Math.min(N-1,cur+1); draw(); changed();
+  }
+
+  /* Enter = a deliberate try; three wrong ones lock it for this visit */
+  async function enter(){
+    if(!idle()) return;
+    clearTimeout(settleT);
+    const pdf = await decrypt(code()).catch(()=>null);
+    if(pdf) return unlock(pdf);
+    if(!idle()) return;
+    if(--tries <= 0){ state="dead"; shell.classList.add("dead"); input.blur(); bKey.disabled=true; liveEl.textContent="Locked."; draw(); }
+  }
+
+  /* each wheel: scroll / drag / tap */
+  wheels.forEach((w,i)=>{
+    let acc = 0;
+    w.addEventListener("wheel", e=>{
+      e.preventDefault(); e.stopPropagation();
+      acc += e.deltaY; if(Math.abs(acc) < 30) return;
+      rotate(i, acc>0 ? 1 : -1); acc = 0;
+    }, {passive:false});
+    let y0=null, steps=0, moved=false;
+    w.addEventListener("pointerdown", e=>{ if(!idle()) return; y0=e.clientY; steps=0; moved=false; w.setPointerCapture(e.pointerId); });
+    w.addEventListener("pointermove", e=>{
+      if(y0===null) return;
+      const s = Math.trunc((y0 - e.clientY)/24);      // drag up → next character
+      if(s!==steps){ rotate(i, s-steps); steps=s; moved=true; }
+    });
+    w.addEventListener("pointerup", e=>{
+      if(y0===null) return; y0=null;
+      if(moved) return;
+      const r = w.getBoundingClientRect(), y = (e.clientY - r.top)/r.height;
+      if(y < .33) rotate(i,-1); else if(y > .67) rotate(i,1); else if(i===cur) advance(); else select(i);
+    });
+    w.addEventListener("pointercancel", ()=>{ y0=null; });
+  });
+
+  /* phones: hidden field, focused only by the keyboard button — nothing pops up on its own */
+  const SENT = "_";
+  input.value = SENT;
+  input.addEventListener("input", ()=>{
+    const v = input.value;
+    if(v.length < SENT.length) back();
+    else [...v.slice(SENT.length)].forEach(type);
+    input.value = SENT;
+  });
+  input.addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); e.stopPropagation(); enter(); } });
+  bKey.addEventListener("click", ()=>{ input.value = SENT; input.focus({preventScroll:true}); });
+
+  /* typing on a computer */
+  function key(e){
+    if(e.target === input) return;
+    const k = e.key;
+    if(k==="Escape"){ e.preventDefault(); close(); return; }
+    if(state==="ok"){ if(k==="Enter"){ e.preventDefault(); view(); } return; }
+    if(k==="Enter"){ e.preventDefault(); enter(); return; }
+    if(k==="Backspace" || k==="ArrowLeft" || k==="<"){ e.preventDefault(); back(); return; }
+    if(k==="ArrowRight"){ e.preventDefault(); advance(); return; }
+    if(k==="ArrowUp"){ e.preventDefault(); rotate(cur,-1); return; }
+    if(k==="ArrowDown"){ e.preventDefault(); rotate(cur,1); return; }
+    if(k.length===1 && /[a-z0-9]/i.test(k) && !e.metaKey && !e.ctrlKey && !e.altKey){ e.preventDefault(); type(k); }
+  }
+
+  /* file = "RSM1" | iterations (u32) | salt (16) | iv (12) | AES-GCM ciphertext */
+  async function decrypt(c){
+    if(!fileBuf){
+      const res = await fetch(RESUME.file, {cache:"no-store"});
+      if(!res.ok) throw new Error("missing");
+      fileBuf = await res.arrayBuffer();
+    }
+    const b = new Uint8Array(fileBuf);
+    if(String.fromCharCode(...b.slice(0,4)) !== "RSM1") throw new Error("missing");
+    const iter = new DataView(fileBuf).getUint32(4);
+    const salt = b.slice(8,24), iv = b.slice(24,36), ct = b.slice(36);
+    const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(c), "PBKDF2", false, ["deriveKey"]);
+    const k = await crypto.subtle.deriveKey({name:"PBKDF2", hash:"SHA-256", salt, iterations:iter}, base, {name:"AES-GCM", length:256}, false, ["decrypt"]);
+    try{ return await crypto.subtle.decrypt({name:"AES-GCM", iv}, k, ct); }
+    catch(_){ return null; }
+  }
+
+  function unlock(pdf){
+    if(state==="ok") return;
+    state = "ok"; shell.classList.add("ok"); draw(); liveEl.textContent = "Unlocked.";
+    pdfURL = URL.createObjectURL(new Blob([pdf], {type:"application/pdf"}));
+    fileBuf = null; input.blur();
+    if(fine) setTimeout(view, 650);                      // computers: straight into the viewer
+    else bView.focus({preventScroll:true});              // phones: tap "view" (opens the phone's PDF viewer)
+  }
+  function view(){
+    if(!pdfURL) return;
+    if(fine){ close(); openApp({ title:"Résumé", url:pdfURL, download:RESUME.saveAs }); }
+    else window.open(pdfURL, "_blank");
+  }
+  bView.addEventListener("click", view);
+  bClose.addEventListener("click", close);
+  document.getElementById("lockBackdrop").addEventListener("click", close);
+
+  function open(){
+    if(state==="ok" && fine){ view(); return; }           // already unlocked this visit
+    isOpen = true;
+    shell.classList.add("is-open"); shell.setAttribute("aria-hidden","false");
+    draw();
+    if(fine) bClose.focus({preventScroll:true});         // never the text field: no surprise keyboard on phones
+  }
+  function close(){
+    if(!isOpen) return;
+    isOpen = false; input.blur();
+    shell.classList.remove("is-open"); shell.setAttribute("aria-hidden","true");
+  }
+  draw();
+  return { open, close, key, get isOpen(){ return isOpen; } };
+})();
+
+/* the Résumé title opens the lock */
+ROOMS.filter(r=>r.lock).forEach(r=>{
+  const t = document.getElementById("title-"+r.id);
+  t.addEventListener("click", e=>{ if(current!==r.id) return; e.stopPropagation(); LOCK.open(); });
+  t.addEventListener("keydown", e=>{ if((e.key==="Enter"||e.key===" ") && current===r.id){ e.preventDefault(); e.stopPropagation(); LOCK.open(); } });
+});
 
 /* build floor-plan minimap */
 const svg = document.getElementById("planSvg");
@@ -864,6 +1152,7 @@ window.addEventListener("keydown", e=>{
   const k = e.key.toLowerCase();
 
   if(appOpen){ if(k==="escape") closeApp(); return; }
+  if(LOCK.isOpen){ LOCK.key(e); return; }
 
   if(k==="escape" && CAROUSELS[current]){ CAROUSELS[current].close(); return; }
 
@@ -884,7 +1173,7 @@ window.addEventListener("keydown", e=>{
 
 let wheelLock = false;
 window.addEventListener("wheel", e=>{
-  if(appOpen || wheelLock || moving || Math.abs(e.deltaY) < 12) return;
+  if(appOpen || LOCK.isOpen || wheelLock || moving || Math.abs(e.deltaY) < 12) return;
   wheelLock = true;
   go(e.deltaY > 0 ? "forward" : "back");
   setTimeout(()=>wheelLock=false, 650);
@@ -893,7 +1182,7 @@ window.addEventListener("wheel", e=>{
 let tx=0, ty=0;
 window.addEventListener("touchstart", e=>{ tx=e.touches[0].clientX; ty=e.touches[0].clientY; }, {passive:true});
 window.addEventListener("touchend", e=>{
-  if(appOpen) return;
+  if(appOpen || LOCK.isOpen) return;
   const dx=e.changedTouches[0].clientX-tx, dy=e.changedTouches[0].clientY-ty;
   if(Math.max(Math.abs(dx),Math.abs(dy)) < 45) return;
   if(Math.abs(dy) > Math.abs(dx)) go(dy<0 ? "forward" : "back");
