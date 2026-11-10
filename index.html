@@ -429,8 +429,6 @@
   .lkbtn svg{ width:22px; height:16px; display:block; }
   .lkbtn.kp{ display:none; }
   @media (pointer:coarse){ .lkbtn.kp{ display:inline-block; } }
-  .lkbtn.go{ display:none; color:var(--lk-ok); text-shadow:0 0 12px var(--lk-ok); font-size:13px; }
-  .lock-shell.ok .lkbtn.go{ display:inline-block; }
   .lock-shell.ok .lkbtn.kp{ display:none; }
   .lock-input{ position:absolute; left:0; top:0; width:1px; height:1px; opacity:0; border:0; padding:0; font-size:16px; }
 
@@ -448,6 +446,24 @@
     .wheel.cur::after{ left:7px; right:7px; }
   }
   @media (prefers-reduced-motion:reduce){ .lock-panel{ animation:none; } }
+
+  /* ---------- RÉSUMÉ VIEWER: only the pages — hard edges, soft shadow; click outside to close ---------- */
+  .doc-shell{ position:fixed; inset:0; z-index:58; display:none; background:rgba(4,6,10,.6); backdrop-filter:blur(12px) saturate(.9); cursor:pointer; }
+  .doc-shell.is-open{ display:block; animation:docfade .35s var(--ease) both; }
+  @keyframes docfade{ from{ opacity:0; } to{ opacity:1; } }
+  .doc-scroll{
+    position:absolute; inset:0; overflow:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
+    display:flex; flex-direction:column; align-items:center; gap:28px; padding:4vh 3vw;
+  }
+  .doc-scroll > :first-child{ margin-top:auto; }            /* centred when it fits, scrolls when it doesn't */
+  .doc-scroll > :last-child{ margin-bottom:auto; }
+  .doc-page{
+    display:block; flex:none; background:#fff; border-radius:0; cursor:default;
+    box-shadow:0 34px 100px -24px rgba(0,0,0,.85), 0 0 70px -18px color-mix(in srgb, var(--a-resume) 45%, transparent);
+    animation:docpage .45s var(--ease) both;
+  }
+  @keyframes docpage{ from{ opacity:0; transform:translateY(12px) scale(.985); } to{ opacity:1; transform:none; } }
+  @media (prefers-reduced-motion:reduce){ .doc-shell.is-open,.doc-page{ animation:none; } }
 
   /* ---------- HUD (ghosted) ---------- */
   .vignette{position:fixed;inset:0;pointer-events:none;z-index:5;
@@ -620,13 +636,16 @@
   </div>
 </div>
 
+<div class="doc-shell" id="docShell" aria-hidden="true">
+  <div class="doc-scroll" id="docScroll" role="dialog" aria-modal="true" aria-label="Résumé"></div>
+</div>
+
 <div class="lock-shell" id="lockShell" aria-hidden="true">
   <div class="lock-backdrop" id="lockBackdrop"></div>
   <div class="lock-panel" role="dialog" aria-modal="true" aria-label="Unlock résumé">
     <div class="wheels" id="wheels" role="group" aria-label="Access code"></div>
     <div class="lock-ctrls">
       <button class="lkbtn kp" id="lkKeypad" aria-label="Show keyboard"><svg viewBox="0 0 22 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1" y="1" width="20" height="14" rx="2"/><path d="M5 5h1M9 5h1M13 5h1M17 5h0M5 8.5h1M9 8.5h1M13 8.5h1M17 8.5h0M7 12h8" stroke-linecap="round"/></svg></button>
-      <button class="lkbtn go" id="lkView">view</button>
       <button class="lkbtn" id="lkClose">close</button>
     </div>
     <div class="sr" id="lockLive" aria-live="polite"></div>
@@ -663,7 +682,7 @@ const PROJECTS = [
    the right code is simply the only thing that can decrypt the file. To replace the résumé or
    change the code, run:  python3 tools/encrypt_resume.py your-resume.pdf
    groups = how the wheels are split visually (4 + 5 = 9 wheels).                                  */
-const RESUME = { file:"resume.enc", groups:[4,5], tries:3, saveAs:"Michael_Valdez_Resume.pdf" };
+const RESUME = { file:"resume.enc", groups:[4,5], tries:3 };
 
 /* ---- Games shown in the Games-room carousel ---- */
 const GAMES = [
@@ -840,13 +859,10 @@ const appOff   = document.getElementById("appOff");
 const appExt   = document.getElementById("appExt");
 let appOpen = false;
 
-const appLive  = appShell.querySelector(".app-live");
 function openApp(p){
   appShell.style.setProperty("--app-accent", "var(" + byId[current].accent + ")");
   appName.textContent = p.title;
   appExt.href = p.url;
-  if(p.download){ appExt.setAttribute("download", p.download); appExt.innerHTML = "download &#8595;"; appLive.textContent = "secure"; }
-  else { appExt.removeAttribute("download"); appExt.innerHTML = "open &#8599;"; appLive.textContent = "live"; }
   appFrame.src = p.url;                     // lazy: only loads now
   appShell.classList.add("is-open");
   appShell.setAttribute("aria-hidden","false");
@@ -863,6 +879,61 @@ function closeApp(){
 appOff.addEventListener("click", closeApp);
 appShell.querySelector(".app-backdrop").addEventListener("click", closeApp);
 
+/* ---------- résumé viewer: draws the PDF pages itself (pdf.js), nothing around them ---------- */
+const DOC = (()=>{
+  const shell  = document.getElementById("docShell");
+  const scroll = document.getElementById("docScroll");
+  const fine   = matchMedia("(pointer:fine)").matches;
+  const vpMeta = document.querySelector('meta[name="viewport"]');
+  const vpLock = vpMeta.content;
+  let isOpen = false, ready = null, pages = [];
+
+  function fit(){                                        // whole page on screen on computers; full width on phones
+    pages.forEach(c=>{
+      const a = c.width / c.height;
+      const w = fine ? Math.min(innerWidth*.94, innerHeight*.92*a, 1000) : innerWidth*.94;
+      c.style.width = Math.round(w) + "px"; c.style.height = Math.round(w/a) + "px";
+    });
+  }
+  function load(bytes){
+    if(ready) return ready;
+    ready = (async ()=>{
+      const pdfjs = await import("./vendor/pdfjs/pdf.min.mjs");
+      pdfjs.GlobalWorkerOptions.workerSrc = "./vendor/pdfjs/pdf.worker.min.mjs";
+      const doc = await pdfjs.getDocument({ data:new Uint8Array(bytes) }).promise;
+      for(let n=1; n<=doc.numPages; n++){
+        const page = await doc.getPage(n);
+        const base = page.getViewport({ scale:1 });
+        const scale = Math.min(2400, Math.max(1700, base.width*(devicePixelRatio||1)*1.6)) / base.width;   // sharp enough to zoom into
+        const vp = page.getViewport({ scale });
+        const c = document.createElement("canvas");
+        c.className = "doc-page"; c.width = Math.floor(vp.width); c.height = Math.floor(vp.height);
+        c.setAttribute("role","img"); c.setAttribute("aria-label", `Résumé, page ${n} of ${doc.numPages}`);
+        await page.render({ canvasContext:c.getContext("2d"), viewport:vp }).promise;
+        pages.push(c);
+      }
+      fit(); pages.forEach(c=> scroll.appendChild(c));
+    })();
+    return ready;
+  }
+  function open(){
+    if(!ready) return;
+    isOpen = true; scroll.scrollTop = 0;
+    if(!fine) vpMeta.content = "width=device-width, initial-scale=1.0";   // let phones pinch-zoom the page
+    shell.classList.add("is-open"); shell.setAttribute("aria-hidden","false");
+    pages.forEach(c=>{ c.style.animation="none"; void c.offsetWidth; c.style.animation=""; });
+  }
+  function close(){
+    if(!isOpen) return;
+    isOpen = false;
+    shell.classList.remove("is-open"); shell.setAttribute("aria-hidden","true");
+    if(!fine) vpMeta.content = vpLock;
+  }
+  shell.addEventListener("click", e=>{ if(!e.target.closest(".doc-page")) close(); });
+  addEventListener("resize", fit);
+  return { load, open, close, get isOpen(){ return isOpen; } };
+})();
+
 /* ---------- résumé lock (rotating padlock, decrypts in the browser) ----------
    Works like a real combination lock: turn any wheel (scroll, drag, tap above/below) or just type.
    Tapping a wheel's middle moves to the next wheel; "<" on a wheel steps back one.
@@ -877,7 +948,6 @@ const LOCK = (()=>{
   const liveEl = document.getElementById("lockLive");
   const input  = document.getElementById("lockInput");
   const bKey   = document.getElementById("lkKeypad");
-  const bView  = document.getElementById("lkView");
   const bClose = document.getElementById("lkClose");
   const fine   = matchMedia("(pointer:fine)").matches;
 
@@ -885,7 +955,7 @@ const LOCK = (()=>{
   let cur = 0;
   let tries = RESUME.tries;             // memory only: a fresh visit gets fresh tries
   let state = "idle";                   // idle | ok | dead
-  let isOpen = false, fileBuf = null, pdfURL = null;
+  let isOpen = false, fileBuf = null;
 
   const wheels = [];
   RESUME.groups.forEach((g,gi)=>{
@@ -986,7 +1056,7 @@ const LOCK = (()=>{
     if(e.target === input) return;
     const k = e.key;
     if(k==="Escape"){ e.preventDefault(); close(); return; }
-    if(state==="ok"){ if(k==="Enter"){ e.preventDefault(); view(); } return; }
+    if(state==="ok") return;
     if(k==="Enter"){ e.preventDefault(); enter(); return; }
     if(k==="Backspace" || k==="ArrowLeft" || k==="<"){ e.preventDefault(); back(); return; }
     if(k==="ArrowRight"){ e.preventDefault(); advance(); return; }
@@ -1015,22 +1085,15 @@ const LOCK = (()=>{
   function unlock(pdf){
     if(state==="ok") return;
     state = "ok"; shell.classList.add("ok"); draw(); liveEl.textContent = "Unlocked.";
-    pdfURL = URL.createObjectURL(new Blob([pdf], {type:"application/pdf"}));
     fileBuf = null; input.blur();
-    if(fine) setTimeout(view, 650);                      // computers: straight into the viewer
-    else bView.focus({preventScroll:true});              // phones: tap "view" (opens the phone's PDF viewer)
+    DOC.load(pdf);                                       // start rendering while the wheels glow green
+    setTimeout(()=>{ close(); DOC.open(); }, 650);
   }
-  function view(){
-    if(!pdfURL) return;
-    if(fine){ close(); openApp({ title:"Résumé", url:pdfURL, download:RESUME.saveAs }); }
-    else window.open(pdfURL, "_blank");
-  }
-  bView.addEventListener("click", view);
   bClose.addEventListener("click", close);
   document.getElementById("lockBackdrop").addEventListener("click", close);
 
   function open(){
-    if(state==="ok" && fine){ view(); return; }           // already unlocked this visit
+    if(state==="ok"){ DOC.open(); return; }              // already unlocked this visit: straight to the résumé
     isOpen = true;
     shell.classList.add("is-open"); shell.setAttribute("aria-hidden","false");
     draw();
@@ -1152,6 +1215,7 @@ window.addEventListener("keydown", e=>{
   const k = e.key.toLowerCase();
 
   if(appOpen){ if(k==="escape") closeApp(); return; }
+  if(DOC.isOpen){ if(k==="escape") DOC.close(); return; }
   if(LOCK.isOpen){ LOCK.key(e); return; }
 
   if(k==="escape" && CAROUSELS[current]){ CAROUSELS[current].close(); return; }
@@ -1173,7 +1237,7 @@ window.addEventListener("keydown", e=>{
 
 let wheelLock = false;
 window.addEventListener("wheel", e=>{
-  if(appOpen || LOCK.isOpen || wheelLock || moving || Math.abs(e.deltaY) < 12) return;
+  if(appOpen || LOCK.isOpen || DOC.isOpen || wheelLock || moving || Math.abs(e.deltaY) < 12) return;
   wheelLock = true;
   go(e.deltaY > 0 ? "forward" : "back");
   setTimeout(()=>wheelLock=false, 650);
@@ -1182,7 +1246,7 @@ window.addEventListener("wheel", e=>{
 let tx=0, ty=0;
 window.addEventListener("touchstart", e=>{ tx=e.touches[0].clientX; ty=e.touches[0].clientY; }, {passive:true});
 window.addEventListener("touchend", e=>{
-  if(appOpen || LOCK.isOpen) return;
+  if(appOpen || LOCK.isOpen || DOC.isOpen) return;
   const dx=e.changedTouches[0].clientX-tx, dy=e.changedTouches[0].clientY-ty;
   if(Math.max(Math.abs(dx),Math.abs(dy)) < 45) return;
   if(Math.abs(dy) > Math.abs(dx)) go(dy<0 ? "forward" : "back");
