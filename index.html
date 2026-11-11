@@ -468,6 +468,55 @@
   @keyframes docpage{ from{ opacity:0; transform:translateY(12px) scale(.985); } to{ opacity:1; transform:none; } }
   @media (prefers-reduced-motion:reduce){ .doc-shell.is-open,.doc-page{ animation:none; } }
 
+  /* ---------- MUSIC: stems drum pad (2D overlay) ---------- */
+  .mix-shell{ position:fixed; inset:0; z-index:55; display:none; --mx:var(--a-music); }
+  .mix-shell.is-open{ display:block; }
+  .mix-backdrop{ position:absolute; inset:0; background:rgba(4,6,10,.72); backdrop-filter:blur(12px) saturate(.9); cursor:pointer; }
+  .mix-panel{
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    display:flex; flex-direction:column; align-items:center; gap:34px;
+    animation:appboot .5s var(--ease) both; user-select:none; -webkit-user-select:none;
+  }
+  .pads{ display:grid; grid-template-columns:repeat(3, var(--pad)); gap:calc(var(--pad)*.14); --pad:min(124px, 26vw); }
+  .spad{
+    --lvl:0;
+    position:relative; width:var(--pad); height:var(--pad); border:0; border-radius:6px; cursor:pointer; padding:0;
+    background:linear-gradient(180deg,#141922,#0b0e14);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.05), inset 0 -2px 0 rgba(0,0,0,.6), 0 6px 14px -6px rgba(0,0,0,.9);
+    transition:background .18s, box-shadow .18s, transform .08s;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .spad::before{ /* the lit surface */
+    content:""; position:absolute; inset:7px; border-radius:3px; pointer-events:none;
+    background:radial-gradient(circle at 50% 50%, color-mix(in srgb,var(--mx) 85%,#fff) 0%, var(--mx) 45%, color-mix(in srgb,var(--mx) 55%,#000) 100%);
+    opacity:calc(.62 + var(--lvl)*.38); transition:opacity .18s;
+    box-shadow:0 0 calc(16px + var(--lvl)*26px) color-mix(in srgb,var(--mx) 70%,transparent), inset 0 0 18px rgba(255,255,255,.25);
+  }
+  .spad span{
+    position:absolute; left:0; right:0; bottom:13px; font-family:var(--mono); font-size:9.5px; letter-spacing:.22em; text-transform:uppercase;
+    color:rgba(20,12,2,.7); transition:color .18s;
+  }
+  .spad.off::before{ opacity:.06; box-shadow:none; }
+  .spad.off span{ color:var(--faint); }
+  .spad:active{ transform:scale(.965); }
+  .spad:focus-visible{ outline:1px solid var(--mx); outline-offset:4px; }
+
+  .transport{ display:flex; gap:22px; }
+  .tbtn{
+    width:58px; height:58px; border-radius:50%; border:0; cursor:pointer; display:grid; place-items:center;
+    background:linear-gradient(180deg,#161b24,#0b0e14); color:var(--muted);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.06), 0 6px 14px -6px rgba(0,0,0,.9);
+    transition:color .2s, box-shadow .2s, transform .08s; -webkit-tap-highlight-color:transparent;
+  }
+  .tbtn svg{ width:20px; height:20px; fill:currentColor; }
+  .tbtn:hover,.tbtn:focus-visible{ outline:none; color:var(--ink); }
+  .tbtn:active{ transform:scale(.95); }
+  .tbtn.on{ color:var(--mx); box-shadow:inset 0 1px 0 rgba(255,255,255,.06), 0 0 22px -4px var(--mx); }
+  .tbtn .i-pause{ display:none; }
+  .tbtn.on .i-play{ display:none; } .tbtn.on .i-pause{ display:block; }
+  .mix-shell.loading .spad::before{ animation:lkblink .6s steps(1,end) infinite; }
+  @media (prefers-reduced-motion:reduce){ .mix-panel{ animation:none; } }
+
   /* ---------- HUD (ghosted) ---------- */
   .vignette{position:fixed;inset:0;pointer-events:none;z-index:5;
     background:linear-gradient(to bottom, var(--bg-deep) 0%, transparent 18%, transparent 80%, rgba(6,7,10,.9) 100%);}
@@ -639,6 +688,17 @@
   </div>
 </div>
 
+<div class="mix-shell" id="mixShell" aria-hidden="true">
+  <div class="mix-backdrop" id="mixBackdrop"></div>
+  <div class="mix-panel" role="dialog" aria-modal="true" aria-label="Stems player">
+    <div class="pads" id="pads" role="group" aria-label="Stems"></div>
+    <div class="transport">
+      <button class="tbtn" id="mxPlay" aria-label="Play"><svg class="i-play" viewBox="0 0 20 20"><path d="M5 3l12 7-12 7z"/></svg><svg class="i-pause" viewBox="0 0 20 20"><path d="M4 3h4v14H4zM12 3h4v14h-4z"/></svg></button>
+      <button class="tbtn" id="mxStop" aria-label="Stop"><svg viewBox="0 0 20 20"><path d="M4 4h12v12H4z"/></svg></button>
+    </div>
+  </div>
+</div>
+
 <div class="doc-shell" id="docShell" aria-hidden="true">
   <div class="doc-scroll" id="docScroll" role="dialog" aria-modal="true" aria-label="Résumé"></div>
 </div>
@@ -687,6 +747,22 @@ const PROJECTS = [
    groups = how the wheels are split visually (4 + 5 = 9 wheels).                                  */
 const RESUME = { file:"resume.enc", groups:[4,5], tries:3 };
 
+/* ---- Music room: stems pad ----
+   One song split into 6 stems, all playing in sync; each pad mutes/unmutes its stem.
+   Set file to an audio URL (e.g. "music/stems/song/drums.m4a"). Pads with no file play a
+   built-in placeholder loop so the player works before real audio is added.            */
+const STEMS = {
+  title: "Placeholder loop",
+  pads: [
+    { name:"Drums",  file:null, demo:"drums" },
+    { name:"Bass",   file:null, demo:"bass"  },
+    { name:"Keys",   file:null, demo:"keys"  },
+    { name:"Lead",   file:null, demo:"lead"  },
+    { name:"Hats",   file:null, demo:"hats"  },
+    { name:"Pad",    file:null, demo:"pad"   },
+  ],
+};
+
 /* ---- Games shown in the Games-room carousel ---- */
 const GAMES = [
   { title:"Elev8or", url:"https://mich-scott.github.io/games/elev8or" },
@@ -715,7 +791,7 @@ const ROOMS = [
     x:-SIDE, y:0, z:-SPACING*2, ry:40, plan:{x:20,y:62}, label:"Art",
     tag:"West wing · 02", now:"Art & Design", links:{ right:"projects" } },
 
-  { id:"music", title:"Music", accent:"--a-music",
+  { id:"music", title:"Music", accent:"--a-music", player:true,
     blurb:"Tracks, mixes, and experiments in sound.",
     x:SIDE, y:0, z:-SPACING*2, ry:-40, plan:{x:80,y:62}, label:"Music",
     tag:"East wing · 02", now:"Music", links:{ left:"projects" } },
@@ -751,6 +827,11 @@ ROOMS.forEach((r,i)=>{
     inner = `<div class="eyebrow door-role">${r.role}</div>
        <h1 class="title door-name">${r.title}</h1>
        <p class="blurb door-stmt">${r.stmt}</p>`;
+  } else if(r.player){
+    inner = `<div class="eyebrow">${r.label}</div>
+       <h2 class="title proj-title" id="title-${r.id}" role="button" tabindex="0" aria-haspopup="dialog">${r.title}</h2>
+       <p class="blurb">${r.blurb}</p>
+       <div class="proj-hint">&#9656; click to play</div>`;
   } else if(r.lock){
     inner = `<div class="eyebrow">${r.label}</div>
        <h2 class="title proj-title" id="title-${r.id}" role="button" tabindex="0" aria-haspopup="dialog">${r.title}</h2>
@@ -1111,6 +1192,167 @@ const LOCK = (()=>{
   return { open, close, key, get isOpen(){ return isOpen; } };
 })();
 
+/* ---------- music: stems drum pad ----------
+   All stems start on the same audio-clock tick and loop together, so they never drift.
+   A pad mutes/unmutes its stem with a short fade (no clicks). Music keeps playing when the
+   panel is closed, so visitors can wander the building with it on.                       */
+const MIX = (()=>{
+  const shell = document.getElementById("mixShell");
+  const padsEl = document.getElementById("pads");
+  const bPlay = document.getElementById("mxPlay"), bStop = document.getElementById("mxStop");
+  const pads = STEMS.pads.map((p,i)=>{
+    const b = document.createElement("button");
+    b.className = "spad"; b.innerHTML = `<span>${p.name}</span>`;
+    b.setAttribute("aria-pressed","true"); b.setAttribute("aria-label", `${p.name} (key ${i+1})`);
+    b.addEventListener("click", ()=> toggle(i));
+    padsEl.appendChild(b); return b;
+  });
+
+  let ctx = null, master = null, buffers = null, loading = null;
+  let gains = [], meters = [], sources = [], on = STEMS.pads.map(()=>true);
+  let playing = false, startAt = 0, offset = 0, isOpen = false, raf = 0;
+
+  function ensureCtx(){
+    if(ctx) return;
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    master = ctx.createGain(); master.gain.value = .9; master.connect(ctx.destination);
+    STEMS.pads.forEach((_,i)=>{
+      const g = ctx.createGain(); g.gain.value = on[i] ? 1 : 0;
+      const a = ctx.createAnalyser(); a.fftSize = 512;
+      g.connect(a); a.connect(master); gains.push(g); meters.push(a);
+    });
+  }
+
+  async function load(){
+    if(loading) return loading;
+    shell.classList.add("loading");
+    loading = Promise.all(STEMS.pads.map(async p=>{
+      if(p.file){
+        const res = await fetch(p.file); if(!res.ok) throw new Error(p.file);
+        return await ctx.decodeAudioData(await res.arrayBuffer());
+      }
+      return demo(p.demo);
+    })).then(b=>{
+      const len = Math.max(...b.map(x=>x.duration));    // a shorter stem is padded with silence so loops stay locked
+      buffers = b.map(x=>{
+        const n = Math.round(len*x.sampleRate); if(x.length >= n) return x;
+        const y = ctx.createBuffer(x.numberOfChannels, n, x.sampleRate);
+        for(let c=0;c<x.numberOfChannels;c++) y.copyToChannel(x.getChannelData(c), c);
+        return y;
+      });
+      buffers.len = len;
+      shell.classList.remove("loading");
+    });
+    return loading;
+  }
+
+  function start(){
+    sources = buffers.map((buf,i)=>{
+      const s = ctx.createBufferSource(); s.buffer = buf; s.loop = true;
+      s.connect(gains[i]); return s;
+    });
+    startAt = ctx.currentTime + .06 - offset;                 // one shared start tick for every stem
+    sources.forEach(s=> s.start(ctx.currentTime + .06, offset % buffers.len));
+  }
+  function halt(){ sources.forEach(s=>{ try{ s.stop(); }catch(_){} }); sources = []; }
+
+  async function play(){
+    ensureCtx(); if(ctx.state==="suspended") await ctx.resume();
+    await load();
+    if(playing){ offset = (ctx.currentTime - startAt) % buffers.len; halt(); playing = false; }   // pause
+    else { start(); playing = true; }
+    ui();
+  }
+  function stop(){ if(ctx){ halt(); } playing = false; offset = 0; ui(); }
+  function toggle(i){
+    on[i] = !on[i];
+    pads[i].classList.toggle("off", !on[i]); pads[i].setAttribute("aria-pressed", on[i]);
+    if(ctx) gains[i].gain.setTargetAtTime(on[i] ? 1 : 0, ctx.currentTime, .015);
+  }
+  function ui(){
+    bPlay.classList.toggle("on", playing); bPlay.setAttribute("aria-label", playing ? "Pause" : "Play");
+    cancelAnimationFrame(raf); if(playing && isOpen) meter(); else pads.forEach(p=>p.style.setProperty("--lvl",0));
+  }
+
+  /* pads glow with their own stem's level */
+  const tmp = new Float32Array(512), lv = STEMS.pads.map(()=>0);
+  function meter(){
+    meters.forEach((a,i)=>{
+      a.getFloatTimeDomainData(tmp);
+      let pk = 0; for(let k=0;k<tmp.length;k++){ const v = Math.abs(tmp[k]); if(v>pk) pk=v; }
+      const target = on[i] ? Math.min(1, Math.pow(pk*2.2, .6)) : 0;
+      lv[i] = target > lv[i] ? target : lv[i]*.9;          // jump up on a hit, ease back down
+      pads[i].style.setProperty("--lvl", lv[i].toFixed(3));
+    });
+    raf = requestAnimationFrame(meter);
+  }
+
+  /* placeholder loops: 4 bars at 100 bpm, synthesised once — replaced by real stems via STEMS */
+  async function demo(kind){
+    const bpm = 100, beat = 60/bpm, bars = 4, dur = beat*4*bars, sr = 44100;
+    const oc = new OfflineAudioContext(2, Math.ceil(dur*sr), sr);
+    const out = oc.createGain(); out.connect(oc.destination);
+    const noise = (()=>{ const b = oc.createBuffer(1, sr, sr), d = b.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1; return b; })();
+    const tone = (type,f,t,len,vol,dest=out)=>{
+      const o = oc.createOscillator(), g = oc.createGain(); o.type = type; o.frequency.value = f;
+      g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vol,t+.01); g.gain.exponentialRampToValueAtTime(.0005,t+len);
+      o.connect(g); g.connect(dest); o.start(t); o.stop(t+len+.05);
+    };
+    const hz = m => 440*Math.pow(2,(m-69)/12);
+    const prog = [[57,60,64],[53,57,60],[48,52,55],[55,59,62]];   // Am F C G
+    for(let bar=0; bar<bars; bar++){
+      const t0 = bar*beat*4, ch = prog[bar];
+      if(kind==="drums") for(let b=0;b<4;b++){
+        const t = t0+b*beat, o = oc.createOscillator(), g = oc.createGain();
+        o.frequency.setValueAtTime(140,t); o.frequency.exponentialRampToValueAtTime(42,t+.18);
+        g.gain.setValueAtTime(1,t); g.gain.exponentialRampToValueAtTime(.001,t+.32); o.connect(g); g.connect(out); o.start(t); o.stop(t+.35);
+        if(b%2){ const n = oc.createBufferSource(), f = oc.createBiquadFilter(), ng = oc.createGain();
+          n.buffer = noise; f.type="bandpass"; f.frequency.value=1800; ng.gain.setValueAtTime(.7,t); ng.gain.exponentialRampToValueAtTime(.001,t+.2);
+          n.connect(f); f.connect(ng); ng.connect(out); n.start(t); n.stop(t+.22); }
+      }
+      if(kind==="hats") for(let s=0;s<8;s++){
+        const t = t0+s*beat/2, n = oc.createBufferSource(), f = oc.createBiquadFilter(), g = oc.createGain();
+        n.buffer = noise; f.type="highpass"; f.frequency.value=8000; g.gain.setValueAtTime(s%2?.25:.4,t); g.gain.exponentialRampToValueAtTime(.001,t+.06);
+        n.connect(f); f.connect(g); g.connect(out); n.start(t); n.stop(t+.08);
+      }
+      if(kind==="bass") [0,1.5,2,3].forEach(b=> tone("sawtooth", hz(ch[0]-24), t0+b*beat, beat*.9, .32));
+      if(kind==="keys") [0,2].forEach(b=> ch.forEach(m=> tone("triangle", hz(m), t0+b*beat, beat*1.8, .16)));
+      if(kind==="lead") [0,.5,1,1.5,2,2.5,3,3.5].forEach((b,k)=> tone("square", hz(ch[k%3]+12+(k>5?12:0)), t0+b*beat, beat*.4, .07));
+      if(kind==="pad") ch.forEach(m=>{ [-6,6].forEach(dt=>{ const o = oc.createOscillator(), g = oc.createGain(), f = oc.createBiquadFilter();
+          o.type="sawtooth"; o.frequency.value = hz(m-12); o.detune.value = dt; f.type="lowpass"; f.frequency.value = 900;
+          g.gain.setValueAtTime(0,t0); g.gain.linearRampToValueAtTime(.05,t0+.8); g.gain.linearRampToValueAtTime(0,t0+beat*4);
+          o.connect(f); f.connect(g); g.connect(out); o.start(t0); o.stop(t0+beat*4); }); });
+    }
+    return oc.startRendering();
+  }
+
+  function open(){
+    isOpen = true; shell.classList.add("is-open"); shell.setAttribute("aria-hidden","false");
+    ensureCtx(); load(); ui();
+  }
+  function close(){
+    if(!isOpen) return;
+    isOpen = false; shell.classList.remove("is-open"); shell.setAttribute("aria-hidden","true"); ui();
+  }
+  function key(e){
+    const k = e.key;
+    if(k==="Escape"){ e.preventDefault(); close(); return; }
+    if(k===" "){ e.preventDefault(); play(); return; }
+    if(/^[1-6]$/.test(k)){ e.preventDefault(); toggle(+k-1); }
+  }
+  bPlay.addEventListener("click", play);
+  bStop.addEventListener("click", stop);
+  document.getElementById("mixBackdrop").addEventListener("click", close);
+  return { open, close, key, get isOpen(){ return isOpen; } };
+})();
+
+/* the Music title opens the pad */
+ROOMS.filter(r=>r.player).forEach(r=>{
+  const t = document.getElementById("title-"+r.id);
+  t.addEventListener("click", e=>{ if(current!==r.id) return; e.stopPropagation(); MIX.open(); });
+  t.addEventListener("keydown", e=>{ if((e.key==="Enter"||e.key===" ") && current===r.id){ e.preventDefault(); e.stopPropagation(); MIX.open(); } });
+});
+
 /* the Résumé title opens the lock */
 ROOMS.filter(r=>r.lock).forEach(r=>{
   const t = document.getElementById("title-"+r.id);
@@ -1219,6 +1461,7 @@ window.addEventListener("keydown", e=>{
 
   if(appOpen){ if(k==="escape") closeApp(); return; }
   if(DOC.isOpen){ if(k==="escape") DOC.close(); return; }
+  if(MIX.isOpen){ MIX.key(e); return; }
   if(LOCK.isOpen){ LOCK.key(e); return; }
 
   if(k==="escape" && CAROUSELS[current]){ CAROUSELS[current].close(); return; }
@@ -1240,7 +1483,7 @@ window.addEventListener("keydown", e=>{
 
 let wheelLock = false;
 window.addEventListener("wheel", e=>{
-  if(appOpen || LOCK.isOpen || DOC.isOpen || wheelLock || moving || Math.abs(e.deltaY) < 12) return;
+  if(appOpen || LOCK.isOpen || DOC.isOpen || MIX.isOpen || wheelLock || moving || Math.abs(e.deltaY) < 12) return;
   wheelLock = true;
   go(e.deltaY > 0 ? "forward" : "back");
   setTimeout(()=>wheelLock=false, 650);
@@ -1249,7 +1492,7 @@ window.addEventListener("wheel", e=>{
 let tx=0, ty=0;
 window.addEventListener("touchstart", e=>{ tx=e.touches[0].clientX; ty=e.touches[0].clientY; }, {passive:true});
 window.addEventListener("touchend", e=>{
-  if(appOpen || LOCK.isOpen || DOC.isOpen) return;
+  if(appOpen || LOCK.isOpen || DOC.isOpen || MIX.isOpen) return;
   const dx=e.changedTouches[0].clientX-tx, dy=e.changedTouches[0].clientY-ty;
   if(Math.max(Math.abs(dx),Math.abs(dy)) < 45) return;
   if(Math.abs(dy) > Math.abs(dx)) go(dy<0 ? "forward" : "back");
