@@ -47,12 +47,47 @@
   scene1Img.onload = () => { bgReady = true; };
   scene1Img.src = 'assets/scene1.png?v=1';
 
-  // hand-drawn character sprite (drawn facing right, feet at bottom)
-  const heroImg = new Image();
-  let heroReady = false;
-  heroImg.onload = () => { heroReady = true; };
-  heroImg.src = 'assets/hero.png?v=1';
-  const HERO_H = 100;               // on-screen height in game pixels
+  // ---- 12-bit princess sprite (16x24, every colour is 3-digit hex = 12-bit) ----
+  const SPR = [
+    "......KKKK......",
+    ".....KHHhHK.....",
+    "....KCCJCCCK....",
+    "...KHHHHHHHHK...",
+    "..KHhHHHHHHhHK..",
+    "..KHSSSSSSSSHK..",
+    "..KHSSSSSSSSHK..",
+    "..KHSESSSSESHK..",
+    "..KHSESSSSESHK..",
+    "..KHBSSSSSSBHK..",
+    "..KHSSSMMSSSHK..",
+    "..KHKSSSSSSKHK..",
+    "..KHHKSSSSKHHK..",
+    "..KHKGGTTGGKHK..",
+    "...KGGGTTGGGK...",
+    "..KGGGGTTGGGGK..",
+    "..KSKGGGGGGKSK..",
+    "...K.KgGGgK.K...",
+    "....KGGLGGGK....",
+    "...KGGLGGGgGK...",
+    "...KGLGGGGgGK...",
+    "..KGLGGGGGGgGK..",
+    "..KTTTTTTTTTTK..",
+    "....KFK..KFK....",
+  ];
+  const FEET = ["....KFK..KFK....", "...KFK....KFK...", ".....KFKKFK....."];
+  const PAL = { K:'#213', H:'#627', h:'#94a', S:'#fdb', B:'#f9a', E:'#213', M:'#c35',
+                C:'#cde', J:'#2cc', G:'#2a6', g:'#174', L:'#6e9', T:'#ffd', F:'#435' };
+  // shimmer palettes: ~40% of her pixels (hair + gown + circlet) flip to these
+  const SHIM_UP   = { G:'#a5e', g:'#73b', L:'#d9f', T:'#fff', H:'#c4a', h:'#f7c', C:'#fff', J:'#ff6' };
+  const SHIM_DOWN = { G:'#38c', g:'#25a', L:'#7cf', T:'#cef', H:'#349', h:'#57c', C:'#cff', J:'#f6c' };
+  const SP = 4;                                    // one sprite pixel = 4 game pixels (64x96)
+  const hash = (x, y, k) => { const n = Math.sin(x * 127.1 + y * 311.7 + k * 74.7) * 43758.5453; return n - Math.floor(n); };
+
+  const fx = { smile: 0, shimmer: 0, shimDur: 1, shimPal: SHIM_UP, idleTimer: 3 + Math.random() * 3 };
+  function react(smile, shimmer, pal) {
+    fx.smile = Math.max(fx.smile, smile);
+    if (shimmer) { fx.shimmer = fx.shimDur = shimmer; fx.shimPal = pal || SHIM_UP; }
+  }
 
   const floorLabel = f => f > 0 ? String(f) : f < 0 ? 'B' + (-f) : null;
 
@@ -196,12 +231,14 @@
     unlockAudio();                  // the gesture that satisfies browser autoplay policy
     char.state = 'turning'; char.facing = 'away';
     stateTimer = 0; buttonLit = true; hint.style.opacity = 0;
+    react(0.9, 1.0, SHIM_UP);       // little thrill as she presses it
   }
   function travel(dir) {
     if (scene !== 2 || char.state !== 'asking') return;
     pendingDir = dir;
     bubbleText = dir > 0 ? 'Going up.' : 'Going down.';
     bubblePop = 0.18;
+    react(0.8, 1.3, dir > 0 ? SHIM_UP : SHIM_DOWN);
     char.state = 'announce'; stateTimer = 0;
   }
   function canvasPoint(e) {
@@ -210,10 +247,17 @@
              y: (e.clientY - r.top)  * (H / r.height) };
   }
   const overButton = p => Math.hypot(p.x - BTN.cx, p.y - BTN.cy) <= BTN.hit;
+  const overChar = p => char.alpha > 0.5 && Math.abs(p.x - char.x) <= 8 * SP * char.scale &&
+                        p.y <= char.feetY && p.y >= char.feetY - 24 * SP * char.scale;
 
-  cv.addEventListener('click', e => { if (overButton(canvasPoint(e))) callElevator(); });
+  cv.addEventListener('click', e => {
+    const pt = canvasPoint(e);
+    if (overButton(pt)) callElevator();
+    else if (overChar(pt)) react(1.4, 1.1, Math.random() < 0.5 ? SHIM_UP : SHIM_DOWN);   // poke her
+  });
   cv.addEventListener('mousemove', e => {
-    const active = scene === 1 && char.state === 'idle' && overButton(canvasPoint(e));
+    const pt = canvasPoint(e);
+    const active = (scene === 1 && char.state === 'idle' && overButton(pt)) || overChar(pt);
     cv.style.cursor = active ? 'pointer' : 'default';
   });
   window.addEventListener('keydown', e => {
@@ -229,7 +273,7 @@
     switch (char.state) {
       case 'walking':
         char.facing = 'left'; char.x -= SPEED * dt; char.phase += dt * 9;
-        if (char.x <= ELE.cx) { char.x = ELE.cx; char.facing = 'front'; char.state = 'idle'; char.phase = 0; }
+        if (char.x <= ELE.cx) { char.x = ELE.cx; char.facing = 'front'; char.state = 'idle'; char.phase = 0; react(1.2, 0); }
         break;
 
       case 'idle': char.facing = 'front'; break;
@@ -292,7 +336,7 @@
       case 'jolting':
         char.facing = 'front';
         shakeTime = Math.max(0, shakeTime - dt);
-        if (shakeTime <= 0) { char.state = 'asking'; bubbleText = 'Elevator going up?'; bubblePop = 0.18; }
+        if (shakeTime <= 0) { react(1.0, 0); char.state = 'asking'; bubbleText = 'Elevator going up?'; bubblePop = 0.18; }
         break;
     }
 
@@ -308,6 +352,12 @@
     char.blinkTimer -= dt;
     if (char.blinkTimer <= 0) { char.blink = 0.12; char.blinkTimer = 2.2 + Math.random() * 2.8; }
     if (char.blink > 0) char.blink -= dt;
+
+    // micro-interactions: smile + shimmer timers, plus the odd idle smile
+    fx.smile = Math.max(0, fx.smile - dt);
+    fx.shimmer = Math.max(0, fx.shimmer - dt);
+    fx.idleTimer -= dt;
+    if (fx.idleTimer <= 0) { react(0.9, Math.random() < 0.3 ? 0.9 : 0); fx.idleTimer = 4 + Math.random() * 4; }
   }
 
   // ---- Draw helpers ----------------------------------------------------
@@ -414,37 +464,37 @@
 
     const bob = resting ? Math.sin(clock * 1.8) * 1.2 : -Math.abs(Math.sin(p)) * 2;
 
-    if (heroReady) {
-      const h = HERO_H, w = h * heroImg.width / heroImg.height;
-      const hop  = moving ? -Math.abs(Math.sin(p)) * 4 : 0;     // bounce while walking
-      const tilt = moving ? Math.sin(p) * 0.06 : 0;              // little waddle
-      if (char.facing === 'left') ctx.scale(-1, 1);
-      ctx.rotate(tilt);
-      ctx.drawImage(heroImg, -w / 2, -h + hop + (resting ? bob : 0), w, h);
-      ctx.restore();
-      ctx.globalAlpha = 1;
-      return;
-    }
+    // walking: hop + shuffle feet; idle: gentle breathing bob (whole sprite pixels)
+    const hop = moving ? -Math.abs(Math.sin(p)) * 4 : R(bob);
+    const feet = moving ? FEET[1 + (Math.floor(p / Math.PI) & 1)] : FEET[0];
+    const away = char.facing === 'away';
+    const smiling = fx.smile > 0;
+    const blinking = char.blink > 0;
+    const shimT = fx.shimmer > 0 ? 1 - fx.shimmer / fx.shimDur : -1;   // 0..1 progress
+    const sparkleTick = Math.floor(clock * 12);
+    const ox = -8 * SP, oy = -24 * SP + hop;
 
-    const legW = 2 * U, legTopY = -4 * U;
-    [{ base: -1.6 * U, ph: p }, { base: 1.6 * U, ph: p + Math.PI }].forEach(L => {
-      const swing = moving ? Math.sin(L.ph) * U : 0;
-      const lift  = moving ? Math.max(0, Math.sin(L.ph)) * 1.5 * U : 0;
-      px(L.base - legW / 2 + swing, legTopY, legW, 4 * U - lift, INK);
-    });
-
-    const bodyW = 6 * U, bodyH = 6 * U, bodyY = -10 * U + bob;
-    px(-bodyW / 2, bodyY, bodyW, bodyH, INK);
-    const headW = 5 * U, headH = 5 * U, headY = bodyY - headH;
-    px(-headW / 2, headY, headW, headH, INK);
-
-    // eyes: pure white, always — never fade
-    if (char.facing !== 'away' && char.blink <= 0) {
-      const look = char.facing === 'left' ? -1.4 * U : char.facing === 'right' ? 1.4 * U : 0;
-      const eyeY = headY + 1.6 * U;
-      ctx.globalAlpha = 1;
-      px(look - 1.4 * U, eyeY, U, U, EYE);
-      px(look + 0.4 * U, eyeY, U, U, EYE);
+    for (let y = 0; y < 24; y++) {
+      const row = y === 23 ? feet : SPR[y];
+      for (let x = 0; x < 16; x++) {
+        let ch = row[x];
+        if (ch === '.') continue;
+        if (away && y >= 5 && y <= 12 && 'SEBMK'.includes(ch) && x > 3 && x < 12) ch = 'H';
+        else if (!away) {
+          if (blinking && y === 7 && ch === 'E') ch = 'S';
+          if (smiling && y === 9 && (x === 6 || x === 9)) ch = 'M';
+        }
+        let c = PAL[ch];
+        // shimmer: a wave sweeps up from the hem; ~40% of all pixels flip colour and sparkle
+        if (shimT >= 0 && fx.shimPal[ch]) {
+          const front = shimT * 1.6;                      // wave position (0 = feet .. 1 = head)
+          const d = front - (23 - y) / 23;
+          const tail = 1 - Math.max(0, shimT - 0.6) / 0.4; // fade out over the last 40%
+          if (d > 0 && hash(x, y, sparkleTick) < 0.8 * tail) c = fx.shimPal[ch];
+        }
+        ctx.fillStyle = c;
+        ctx.fillRect(ox + x * SP, oy + y * SP, SP, SP);
+      }
     }
     ctx.restore();
     ctx.globalAlpha = 1;
