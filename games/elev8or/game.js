@@ -47,6 +47,13 @@
   scene1Img.onload = () => { bgReady = true; };
   scene1Img.src = 'assets/scene1.png?v=1';
 
+  // hand-drawn character sprite (drawn facing right, feet at bottom)
+  const heroImg = new Image();
+  let heroReady = false;
+  heroImg.onload = () => { heroReady = true; };
+  heroImg.src = 'assets/hero.png?v=1';
+  const HERO_H = 100;               // on-screen height in game pixels
+
   const floorLabel = f => f > 0 ? String(f) : f < 0 ? 'B' + (-f) : null;
 
   // signed lighting target as a linear floor fraction; shaped per-side below
@@ -406,6 +413,18 @@
     ctx.scale(char.scale, char.scale);
 
     const bob = resting ? Math.sin(clock * 1.8) * 1.2 : -Math.abs(Math.sin(p)) * 2;
+
+    if (heroReady) {
+      const h = HERO_H, w = h * heroImg.width / heroImg.height;
+      const hop  = moving ? -Math.abs(Math.sin(p)) * 4 : 0;     // bounce while walking
+      const tilt = moving ? Math.sin(p) * 0.06 : 0;              // little waddle
+      if (char.facing === 'left') ctx.scale(-1, 1);
+      ctx.rotate(tilt);
+      ctx.drawImage(heroImg, -w / 2, -h + hop + (resting ? bob : 0), w, h);
+      ctx.restore();
+      ctx.globalAlpha = 1;
+      return;
+    }
 
     const legW = 2 * U, legTopY = -4 * U;
     [{ base: -1.6 * U, ph: p }, { base: 1.6 * U, ph: p + Math.PI }].forEach(L => {
